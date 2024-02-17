@@ -1,0 +1,109 @@
+module _3gpp-common-yang-extensions-test {
+  yang-version 1.1;
+  namespace "urn:3gpp:xa5:_3gpp-common-yang-extensions-test";
+  prefix testyext3gpp;
+
+  import _3gpp-common-managed-element { prefix me3gpp; }
+  import _3gpp-common-top { prefix top3gpp; }
+  import _3gpp-common-yang-extensions { prefix yext3gpp; }
+
+  organization "3GPP SA5";
+  contact "https://www.3gpp.org/DynaReport/TSG-WG--S5--officials.htm?Itemid=464";
+  description "_3gpp-common-yang-extensions grammar validation test YANG module.
+    Copyright Ericsson AB 2024.";
+  reference "3GPP TS Test";
+
+  revision 2024-01-14 { reference "" ; }
+
+  grouping AlphaGrp {
+    description "";
+    list alpha {
+      key "beta";
+      yext3gpp:notNotifyable;
+      yext3gpp:inVariant;
+      description "";
+      action apple {
+        description "";
+        output {
+          leaf mango {
+            type string;
+            yext3gpp:initial-value 'test';
+            description "";
+          }
+        }
+      }
+      leaf beta {
+        type string;
+        yext3gpp:inVariant;
+        yext3gpp:notNotifyable;
+        yext3gpp:initial-value 'test';
+        description "";
+      }
+      leaf gamma {
+        type string;
+        yext3gpp:initial-value 'test2';
+        yext3gpp:initial-value 'test3';
+        yext3gpp:initial-value 'test4';
+        description "Initial-value: ";
+      }
+      leaf-list gamma2 {
+        type string;
+        yext3gpp:initial-value 'test5';
+        yext3gpp:initial-value 'test6';
+        yext3gpp:initial-value 'test7';
+        description "Initial-value: ";
+      }
+      leaf delta {
+        type string;
+        config false;
+        yext3gpp:inVariant;
+        yext3gpp:notNotifyable;
+        yext3gpp:initial-value 'test';
+        description "Initial-value: ";
+      }
+      list omega {
+        key theta;
+        description "";
+        leaf theta {
+          type string;
+          yext3gpp:inVariant;
+          description "";
+        }
+      }
+    }
+  }
+
+  augment "/me3gpp:ManagedElement" {
+    description "";
+    list Alpha {
+      key id;
+      uses top3gpp:Top_Grp;
+      yext3gpp:notNotifyable;
+      description "";
+      container attributes {
+        description "";
+        uses AlphaGrp;
+        action zeta {
+          description "";
+          input {
+            leaf psi {
+              yext3gpp:initial-value 'test';
+              type string;
+              description "";
+            }
+          }
+        }
+      }
+    }
+  }
+
+  notification banana {
+    leaf orange {
+      type string;
+      yext3gpp:notNotifyable;
+      yext3gpp:initial-value 'test';
+      description "";
+    }
+    description "";
+  }
+}
