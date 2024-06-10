@@ -26,7 +26,11 @@ in [Initialize Request][initialize] procedure as seen below.
                 "willSaveWaitUntil": false,
                 "save": false
             },
+            "hoverProvider": true,
             "documentFormattingProvider": true,
+            "workspaceSymbolProvider": {
+                "resolveProvider": false
+            },
             "executeCommandProvider": {
                 "commands": []
             },

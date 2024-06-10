@@ -55,7 +55,7 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
                              help="Show version number and exit"),
         optparse.make_option("-V", "--verbose",
                              action="store_true"),
-        optparse.make_option("-e", "--list-errors",
+        optparse.make_option("-g", "--list-errors",
                              dest="list_errors",
                              action="store_true",
                              help="Print a listing of all error and warning " \
@@ -311,6 +311,10 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
                 print("Error:   %s" % tag)
             print("Message: %s" % fmt)
             print("")
+        sys.exit(0)
+
+    if o.lsp_config_schema is True:
+        pyangls.gen_config_schema()
         sys.exit(0)
 
     # patch the error spec so that -W errors are treated as warnings

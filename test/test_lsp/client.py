@@ -75,6 +75,11 @@ def _ensure_server_capabilities(caps: lsp.ServerCapabilities):
     assert not caps.text_document_sync.will_save_wait_until
     assert not caps.text_document_sync.save
 
+    assert caps.hover_provider
+    assert caps.document_symbol_provider
+    assert caps.workspace_symbol_provider is not None
+    assert type(caps.workspace_symbol_provider) is lsp.WorkspaceSymbolOptions
+    assert not caps.workspace_symbol_provider.resolve_provider
     assert caps.document_formatting_provider
 
     assert caps.execute_command_provider is not None
@@ -113,10 +118,8 @@ def _ensure_server_incapabilities(caps: lsp.ServerCapabilities):
     assert caps.document_link_provider is None
     assert caps.document_on_type_formatting_provider is None
     assert caps.document_range_formatting_provider is None
-    assert caps.document_symbol_provider is None
     assert caps.experimental is None
     assert caps.folding_range_provider is None
-    assert caps.hover_provider is None
     assert caps.implementation_provider is None
     assert caps.inlay_hint_provider is None
     assert caps.inline_completion_provider is None
@@ -131,7 +134,6 @@ def _ensure_server_incapabilities(caps: lsp.ServerCapabilities):
     assert caps.signature_help_provider is None
     assert caps.type_definition_provider is None
     assert caps.type_hierarchy_provider is None
-    assert caps.workspace_symbol_provider is None
 
 def _validate_initialize_result(result: lsp.InitializeResult):
     """Validate `initialize` result"""

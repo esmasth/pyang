@@ -6,6 +6,7 @@ from . import types
 from . import syntax
 from . import grammar
 from . import xpath
+from . import error
 from .error import err_add
 
 ### Functions that plugins can use
