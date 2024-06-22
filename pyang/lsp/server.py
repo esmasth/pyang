@@ -13,6 +13,9 @@ from pyang import context
 from pyang import plugin
 from pyang import syntax
 from pyang import statements
+from pyang.lsp.glue import epos_to_lsp_range
+from pyang.lsp.rfcref import rfcref_stmt_map, rfcref_type_map
+from pyang.lsp.utils import stmt_from_epos_line
 from pyang.statements import Statement, ModSubmodStatement
 from pyang.translators import yang
 
@@ -417,422 +420,6 @@ def _process_workspace_configuration(scope: str | None, config: List[Any]):
     pass
 
 
-stmt_rfcref_map = {
-    'module': {
-        'title': 'The `module` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.1',
-    },
-    'yang-version': {
-        'title': 'The `yang-version` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.1.2',
-    },
-    'namespace': {
-        'title': 'The `namespace` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.1.3',
-    },
-    'prefix': {
-        'title': 'The `prefix` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.1.4',
-    },
-    'import': {
-        'title': 'The `import` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.1.5',
-        'substmt': {
-            'prefix': {
-                'title': 'The `import`\'s `prefix` Statement',
-                'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.1.5',
-            },
-        },
-    },
-    'revision-date': {
-        'title': 'The `revision-date` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.1.5.1',
-    },
-    'include': {
-        'title': 'The `include` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.1.6',
-    },
-    'organization': {
-        'title': 'The `organization` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.1.7',
-    },
-    'contact': {
-        'title': 'The `contact` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.1.8',
-    },
-    'revision': {
-        'title': 'The `revision` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.1.9',
-    },
-    'submodule': {
-        'title': 'The `submodule` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.2',
-    },
-    'belongs-to': {
-        'title': 'The `belongs-to` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.2.2',
-    },
-    'typedef': {
-        'title': 'The `typedef` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.3',
-        'substmt': {
-            'type': {
-                'title': 'The `typedef`\'s `type` Statement',
-                'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.3.2',
-            },
-            'default': {
-                'title': 'The `typedef`\'s `default` Statement',
-                'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.3.4',
-            },
-        },
-    },
-    'units': {
-        'title': 'The `units` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.3.3',
-    },
-    'type': {
-        'title': 'The `type` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.4',
-    },
-    'container': {
-        'title': 'The `container` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.5',
-    },
-    'must': {
-        'title': 'The `must` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.5.3',
-    },
-    'error-message': {
-        'title': 'The `error-message` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.5.4.1',
-    },
-    'error-app-tag': {
-        'title': 'The `error-app-tag` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.5.4.2',
-    },
-    'presence': {
-        'title': 'The `presence` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.5.5',
-    },
-    'leaf': {
-        'title': 'The `leaf` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.6',
-        'substmt': {
-            'type': {
-                'title': 'The `leaf`\'s `type` Statement',
-                'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.6.3',
-            },
-            'default': {
-                'title': 'The `leaf`\'s `default` Statement',
-                'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.6.4',
-            },
-            'mandatory': {
-                'title': 'The `leaf`\'s `mandatory` Statement',
-                'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.6.5',
-            },
-        },
-    },
-    'leaf-list': {
-        'title': 'The `leaf-list` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.7',
-        'substmt': {
-            'default': {
-                'title': 'The `leaf-list`\'s `default` Statement',
-                'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.7.4',
-            },
-        },
-    },
-    'min-elements': {
-        'title': 'The `min-elements` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.7.5',
-    },
-    'max-elements': {
-        'title': 'The `max-elements` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.7.6',
-    },
-    'ordered-by': {
-        'title': 'The `ordered-by` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.7.7',
-    },
-    'list': {
-        'title': 'The `list` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.8',
-    },
-    'key': {
-        'title': 'The `list`\'s `key` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.8.2',
-    },
-    'unique': {
-        'title': 'The `list`\'s `unique` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.8.3',
-    },
-    'choice': {
-        'title': 'The `choice` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.9',
-        'substmt': {
-            'default': {
-                'title': 'The `choice`\'s `default` Statement',
-                'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.9.3',
-            },
-            'mandatory': {
-                'title': 'The `choice`\'s `mandatory` Statement',
-                'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.9.4',
-            },
-        },
-    },
-    'case': {
-        'title': 'The `choice`\'s `case` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.9.2',
-    },
-    'anydata': {
-        'title': 'The `anydata` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.10',
-    },
-    'anyxml': {
-        'title': 'The `anyxml` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.11',
-    },
-    'grouping': {
-        'title': 'The `grouping` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.12',
-    },
-    'uses': {
-        'title': 'The `uses` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.13',
-    },
-    'refine': {
-        'title': 'The `refine` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.13.2',
-    },
-    'rpc': {
-        'title': 'The `rpc` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.14',
-    },
-    'input': {
-        'title': 'The `input` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.14.2',
-    },
-    'output': {
-        'title': 'The `output` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.14.3',
-    },
-    'action': {
-        'title': 'The `action` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.15',
-    },
-    'notification': {
-        'title': 'The `notification` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.16',
-    },
-    'augment': {
-        'title': 'The `augment` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.17',
-    },
-    'identity': {
-        'title': 'The `identity` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.18',
-        'substmt': {
-            'base': {
-                'title': 'The `base` Statement',
-                'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.18.2',
-            },
-        }
-    },
-    'extension': {
-        'title': 'The `extension` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.19',
-    },
-    'argument': {
-        'title': 'The `argument` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.19.2',
-    },
-    'yin-element': {
-        'title': 'The `yin-element` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.19.2.2',
-    },
-    'feature': {
-        'title': 'The `feature` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.20.1',
-    },
-    'if-feature': {
-        'title': 'The `if-feature` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.20.2',
-    },
-    'deviation': {
-        'title': 'The `deviation` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.20.3',
-    },
-    'deviate': {
-        'title': 'The `deviate` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.20.3.2',
-    },
-    'config': {
-        'title': 'The `config` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.21.1',
-    },
-    'status': {
-        'title': 'The `status` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.21.2',
-    },
-    'description': {
-        'title': 'The `description` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.21.3',
-    },
-    'reference': {
-        'title': 'The `reference` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.21.4',
-    },
-    'when': {
-        'title': 'The `when` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.21.5',
-    },
-    'range': {
-        'title': 'The `range` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.2.4',
-    },
-    'fraction-digits': {
-        'title': 'The `fraction-digits` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.3.4',
-    },
-    'length': {
-        'title': 'The `length` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.4.4',
-    },
-    'pattern': {
-        'title': 'The `pattern` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.4.5',
-    },
-    'modifier': {
-        'title': 'The `modifier` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.4.6',
-    },
-    'enum': {
-        'title': 'The `enum` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.6.4',
-    },
-    'value': {
-        'title': 'The `value` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.6.4.2',
-    },
-    'bit': {
-        'title': 'The `bit` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.7.4',
-    },
-    'value': {
-        'title': 'The `value` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.7.4.2',
-    },
-    'path': {
-        'title': 'The `path` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.9.2',
-    },
-    'require-instance': {
-        'title': 'The `require-instance` Statement',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.9.3',
-    },
-}
-
-
-def _stmt_from_epos_line(
-    line: int,
-    stmt: Statement,
-    substmts=True,
-    i_children=True,
-) -> Statement | None:
-    """Gets first statement found on 1 indexed line number"""
-    pos : error.Position = stmt.pos
-    if pos.line == line:
-        return stmt
-    if substmts and stmt.substmts:
-        for s in stmt.substmts:
-            line_stmt = _stmt_from_epos_line(line, s, substmts, i_children)
-            if line_stmt:
-                return line_stmt
-    if i_children and hasattr(stmt, 'i_children'):
-        for s in stmt.i_children:
-            line_stmt = _stmt_from_epos_line(line, s, substmts, i_children)
-            if line_stmt:
-                return line_stmt
-
-type_rfcref_map = {
-    'int8': {
-        'title': 'The Integer Built-In Types',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.2',
-    },
-    'int16': {
-        'title': 'The Integer Built-In Types',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.2',
-    },
-    'int32': {
-        'title': 'The Integer Built-In Types',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.2',
-    },
-    'int64': {
-        'title': 'The Integer Built-In Types',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.2',
-    },
-    'uint8': {
-        'title': 'The Integer Built-In Types',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.2',
-    },
-    'uint16': {
-        'title': 'The Integer Built-In Types',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.2',
-    },
-    'uint32': {
-        'title': 'The Integer Built-In Types',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.2',
-    },
-    'uint64': {
-        'title': 'The Integer Built-In Types',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.2',
-    },
-    'decimal64': {
-        'title': 'The decimal64 Built-In Type',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.3',
-    },
-    'string':{
-        'title': 'The `string` Built-In Type',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.4',
-    },
-    'boolean': {
-        'title': 'The `boolean` Built-In Type',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.5',
-    },
-    'enumeration': {
-        'title': 'The `enumeration` Built-In Type',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.6',
-    },
-    'bits': {
-        'title': 'The `bits` Built-In Type',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.7',
-    },
-    'binary': {
-        'title': 'The `binary` Built-In Type',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.8',
-    },
-    'leafref': {
-        'title': 'The `leafref` Built-In Type',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.9',
-    },
-    'identityref': {
-        'title': 'The `identityref` Built-In Type',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.10',
-    },
-    'empty': {
-        'title': 'The `empty` Built-In Type',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.11',
-    },
-    'union': {
-        'title': 'The `union` Built-In Type',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.12',
-    },
-    'instance-identifier': {
-        'title': 'The `instance-identifier` Built-In Type',
-        'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.13',
-    },
-}
-
 ref_map = {
     'uses': 'grouping',
     'path': 'leaf',
@@ -890,7 +477,7 @@ def text_document_hover(
 
     hover_value = ''
     # TODO: handle multiple statements on a line
-    stmt = _stmt_from_epos_line(line, module)
+    stmt = stmt_from_epos_line(line, module)
     if stmt:
         # TODO: Handle hover for statements which do not have descriptions
         def stmt_supports_keyword(stmt: Statement, keyword):
@@ -935,7 +522,7 @@ def text_document_hover(
                     hover_value += '**' + module.keyword + '**: ' + desc
         elif stmt.keyword == 'type':
             try:
-                type_rfcref = type_rfcref_map[stmt.arg] # type: ignore
+                type_rfcref = rfcref_type_map[stmt.arg] # type: ignore
                 hover_value += type_rfcref['title'] + ' ' + type_rfcref['uri']
             except KeyError:
                 typedef = _stmt_from_ref_stmt(stmt)
@@ -976,9 +563,9 @@ def text_document_hover(
                     hover_value += '**' + ref_map[stmt.keyword] + '**: ' + desc
         try:
             try:
-                stmt_rfcref = stmt_rfcref_map[stmt.parent.keyword]['substmt'][stmt.keyword]
+                stmt_rfcref = rfcref_stmt_map[stmt.parent.keyword]['substmt'][stmt.keyword]
             except (KeyError, AttributeError):
-                stmt_rfcref = stmt_rfcref_map[stmt.keyword]
+                stmt_rfcref = rfcref_stmt_map[stmt.keyword]
             if hover_value != '':
                 hover_value += '\n___\n'
             hover_value += stmt_rfcref['title'] + ' ' + stmt_rfcref['uri']
@@ -996,86 +583,94 @@ def text_document_hover(
         )
     )
 
+_leaf_lsp_symbol_kind = {
+    'uint8': lsp.SymbolKind.Number,
+    'uint16': lsp.SymbolKind.Number,
+    'uint32': lsp.SymbolKind.Number,
+    'uint64': lsp.SymbolKind.Number,
+    'int8': lsp.SymbolKind.Number,
+    'int16': lsp.SymbolKind.Number,
+    'int32': lsp.SymbolKind.Number,
+    'int64': lsp.SymbolKind.Number,
+    'decimal64': lsp.SymbolKind.Number,
+    'string': lsp.SymbolKind.String,
+    'boolean': lsp.SymbolKind.Boolean,
+    'enumeration': lsp.SymbolKind.Enum,
+    'bits': lsp.SymbolKind.Field,
+    'leafref': lsp.SymbolKind.Variable,
+}
+"""Static unconditional leaf keyword mapping"""
+
+_lsp_symbol_kind = {
+    'module': lsp.SymbolKind.Module,
+    'submodule': lsp.SymbolKind.Module,
+    'yang-version': lsp.SymbolKind.Property,
+    'revision': lsp.SymbolKind.Property,
+    'contact': lsp.SymbolKind.Property,
+    'organization': lsp.SymbolKind.Property,
+    'description': lsp.SymbolKind.Property,
+    'reference': lsp.SymbolKind.Property,
+    'base': lsp.SymbolKind.Property,
+    'value': lsp.SymbolKind.Property,
+    'namespace': lsp.SymbolKind.Property,
+    'prefix': lsp.SymbolKind.Property,
+    'feature': lsp.SymbolKind.Boolean,
+    'if-feature': lsp.SymbolKind.Operator,
+    'when': lsp.SymbolKind.Operator,
+    'must': lsp.SymbolKind.Operator,
+    'choice': lsp.SymbolKind.Operator,
+    'case': lsp.SymbolKind.Operator,
+    'grouping': lsp.SymbolKind.Struct,
+    'extension': lsp.SymbolKind.Operator,
+    'key': lsp.SymbolKind.Key,
+    'identity': lsp.SymbolKind.Class,
+    'typedef': lsp.SymbolKind.TypeParameter,
+    'container': lsp.SymbolKind.Class,
+    'list': lsp.SymbolKind.Array,
+    'leaf-list': lsp.SymbolKind.Array,
+    'rpc': lsp.SymbolKind.Function,
+    'action': lsp.SymbolKind.Function,
+    'input': lsp.SymbolKind.Operator,
+    'output': lsp.SymbolKind.Operator,
+    'notification': lsp.SymbolKind.Event,
+    'enum': lsp.SymbolKind.EnumMember,
+    'value': lsp.SymbolKind.EnumMember,
+    'anyxml': lsp.SymbolKind.Field,
+    'augment': lsp.SymbolKind.Operator,
+    'deviation': lsp.SymbolKind.Operator,
+    'deviate': lsp.SymbolKind.Operator,
+    'config': lsp.SymbolKind.Property,
+    'mandatory': lsp.SymbolKind.Property,
+    'max-elements': lsp.SymbolKind.Property,
+    'min-elements': lsp.SymbolKind.Property,
+    'default': lsp.SymbolKind.Property,
+    'uses': lsp.SymbolKind.Operator,
+}
+"""Static unconditional keyword mapping"""
+
 def _stmt_to_lsp_symbol_kind(stmt: Statement) -> lsp.SymbolKind:
-    symbol_kind = lsp.SymbolKind.Null
     if stmt.arg is None:
         return lsp.SymbolKind.Property
-    if type(stmt.keyword) is not str:
-        # TODO: handle extensions
-        pass
-    elif stmt.keyword in ['module', 'submodule']:
-        symbol_kind = lsp.SymbolKind.Module
-    elif stmt.keyword in ['yang-version', 'revision', 'contact', 'organization',
-                          'description', 'reference', 'base']:
-        symbol_kind = lsp.SymbolKind.Property
-    elif stmt.keyword in ['namespace', 'prefix']:
-        symbol_kind = lsp.SymbolKind.Namespace
-    elif stmt.keyword == 'feature':
-        symbol_kind = lsp.SymbolKind.Boolean
-    elif stmt.keyword in ['if-feature', 'when', 'must', 'choice', 'case']:
-        symbol_kind = lsp.SymbolKind.Operator
-    elif stmt.keyword == 'grouping':
-        symbol_kind = lsp.SymbolKind.Struct
-    elif stmt.keyword == 'extension':
-        symbol_kind = lsp.SymbolKind.Operator
-    elif stmt.keyword == 'key':
-        symbol_kind = lsp.SymbolKind.Key
-    elif stmt.keyword == 'identity':
-        symbol_kind = lsp.SymbolKind.Class
-    elif stmt.keyword == 'typedef':
-        symbol_kind = lsp.SymbolKind.TypeParameter
-    elif stmt.keyword in ['container']:
-        symbol_kind = lsp.SymbolKind.Class
-    elif stmt.keyword in ['list', 'leaf-list']:
-        symbol_kind = lsp.SymbolKind.Array
-    elif stmt.keyword in ['rpc', 'action']:
-        if stmt.parent == stmt.top:
-            symbol_kind = lsp.SymbolKind.Function
-        else:
-            symbol_kind = lsp.SymbolKind.Method
-    elif stmt.keyword in ['input', 'output']:
-        symbol_kind = lsp.SymbolKind.Property
-    elif stmt.keyword in ['notification']:
-        symbol_kind = lsp.SymbolKind.Event
-    elif stmt.keyword in ['enum']:
-        symbol_kind = lsp.SymbolKind.EnumMember
-    elif stmt.keyword in ['anyxml']:
-        symbol_kind = lsp.SymbolKind.Field
-    elif stmt.keyword in ['augment']:
-        symbol_kind = lsp.SymbolKind.Operator
-    elif stmt.keyword in ['deviation', 'deviate']:
-        symbol_kind = lsp.SymbolKind.Operator
-    elif stmt.keyword in ['config', 'mandatory', 'max-elements', 'min-elements',
-                          'default']:
-        symbol_kind = lsp.SymbolKind.Property
-    elif stmt.keyword in ['leaf']:
-        symbol_kind = lsp.SymbolKind.Field
-        stmt_type: Statement | None = stmt.search_one('type')
-        if stmt_type:
-            if stmt_type.arg in ['uint8', 'uint16', 'uint32', 'uint64',
-                                'int8', 'int16', 'int32', 'int64', 'decimal64']:
-                symbol_kind = lsp.SymbolKind.Number
-            elif stmt_type.arg == 'string':
-                symbol_kind = lsp.SymbolKind.String
-            elif stmt_type.arg == 'boolean':
-                symbol_kind = lsp.SymbolKind.Boolean
-            elif stmt_type.arg == 'enumeration':
-                symbol_kind = lsp.SymbolKind.Enum
-            elif stmt_type.arg == 'bits':
-                symbol_kind = lsp.SymbolKind.Field
-            elif stmt_type.arg == 'leafref':
-                # TODO: resolve type of the reference
-                symbol_kind = lsp.SymbolKind.Variable
-    elif stmt.keyword == 'uses':
-        symbol_kind = lsp.SymbolKind.Operator
-
-    return symbol_kind
-
-def _epos_to_lsp_range(epos: error.Position):
-    return lsp.Range(
-        start=lsp.Position(line=epos.line - 1, character=0),
-        end=lsp.Position(line=epos.line, character=0),
-    )
+    match stmt.keyword:
+        case str():
+            match stmt.keyword:
+                case 'leaf':
+                    stmt_type: Statement | None = stmt.search_one('type')
+                    if not stmt_type:
+                        raise AssertionError
+                    try:
+                        return _leaf_lsp_symbol_kind[stmt_type.arg]
+                    except KeyError:
+                        return lsp.SymbolKind.Field
+                case _:
+                    try:
+                        return _lsp_symbol_kind[stmt.keyword]
+                    except KeyError:
+                        return lsp.SymbolKind.Null
+        case (str(), str()):
+            return lsp.SymbolKind.Null
+        case _:
+            raise TypeError
 
 def _build_doc_stmt_symbols(stmt: Statement) -> lsp.DocumentSymbol | None:
     if stmt.keyword in ['description', 'reference', 'type', 'status',
@@ -1143,8 +738,8 @@ def _build_doc_stmt_symbols(stmt: Statement) -> lsp.DocumentSymbol | None:
     return lsp.DocumentSymbol(
         name=symbol_name,
         kind=symbol_kind,
-        range=_epos_to_lsp_range(pos),
-        selection_range=_epos_to_lsp_range(pos),
+        range=epos_to_lsp_range(pos),
+        selection_range=epos_to_lsp_range(pos),
         detail=symbol_detail,
         tags=symbol_tags,
         children=symbol_children,
@@ -1306,7 +901,7 @@ def _build_ws_stmt_symbols(
 
     symbol_location = lsp.Location(
         uri=doc_uri,
-        range=_epos_to_lsp_range(stmt.pos),
+        range=epos_to_lsp_range(stmt.pos),
     )
     symbol_tags = None
     symbol_kind = _stmt_to_lsp_symbol_kind(stmt)
@@ -1383,7 +978,7 @@ def type_definition(
     line = params.position.line + 1
     definition_links = None
     # TODO: handle multiple statements on a line
-    stmt = _stmt_from_epos_line(line, module)
+    stmt = stmt_from_epos_line(line, module)
     if stmt and stmt.keyword == 'type' and stmt.arg:
         prefix_parts = str(stmt.arg).rsplit(':')
         if len(prefix_parts) == 1:
@@ -1410,13 +1005,13 @@ def type_definition(
         typedef: Statement
         for typedef in typedefs:
             if typedef.arg == typedef_name:
-                typedef_range = _epos_to_lsp_range(typedef.pos)
+                typedef_range = epos_to_lsp_range(typedef.pos)
                 break
         definition_link = lsp.LocationLink(
             target_uri=typedef_uri,
             target_range=typedef_range,
             target_selection_range=typedef_range,
-            origin_selection_range=_epos_to_lsp_range(stmt.pos)
+            origin_selection_range=epos_to_lsp_range(stmt.pos)
         )
         definition_links = [definition_link]
     return definition_links
