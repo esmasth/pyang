@@ -79,12 +79,12 @@ class YangTokenizer(object):
 
         # do not keep comments in the syntax tree
         if not keep_comments:
-            # skip line comment
             if self.buf[0] == '/':
+                # skip line comment
                 if self.buf[1] == '/':
                     self.readline()
                     return self.skip(keep_comments=keep_comments)
-            # skip block comment
+                # skip block comment
                 elif self.buf[1] == '*':
                     i = self.buf.find('*/')
                     while i == -1:
@@ -125,9 +125,6 @@ class YangTokenizer(object):
             return cmt, is_line_end, is_multi_line
 
     def get_keyword(self):
-        """ret: identifier | (prefix, identifier)"""
-        self.skip()
-
         m = syntax.re_keyword.match(self.buf)
         if m is None:
             error.err_add(self.errors, self.pos,
@@ -169,8 +166,6 @@ class YangTokenizer(object):
 
     def get_strings(self, need_quote=False):
         """ret: string"""
-        self.skip()
-
         if self.buf[0] == ';' or self.buf[0] == '{' or self.buf[0] == '}':
             error.err_add(self.errors, self.pos,
                           'EXPECTED_ARGUMENT', self.buf[0])
@@ -335,14 +330,24 @@ class YangParser(object):
                 if parent is not None:
                     return stmt
 
+        self.tokenizer.skip()
+        self.pos.kwd_sline = self.tokenizer.pos.line - 1
+        self.pos.kwd_schar = self.tokenizer.offset
         keywd = self.tokenizer.get_keyword()
+        self.pos.kwd_eline = self.pos.line - 1
+        self.pos.kwd_echar = self.tokenizer.offset
         # check for argument
         tok = self.tokenizer.peek()
         if tok == '{' or tok == ';':
             arg = None
             argstrs = None
         else:
+            self.tokenizer.skip()
+            self.pos.arg_sline = self.tokenizer.pos.line - 1
+            self.pos.arg_schar = self.tokenizer.offset
             argstrs = self.tokenizer.get_strings()
+            self.pos.arg_eline = self.tokenizer.pos.line - 1
+            self.pos.arg_echar = self.tokenizer.offset
             arg = ''.join([a[0] for a in argstrs])
         # check for YANG 1.1
         if keywd == 'yang-version' and arg == '1.1':

@@ -7,6 +7,14 @@ class Position(object):
     __slots__ = (
         'ref',
         'line',
+        'kwd_sline', # 0 indexed
+        'kwd_schar', # 0 indexed
+        'kwd_eline', # 0 indexed
+        'kwd_echar', # 0 indexed
+        'arg_sline', # 0 indexed
+        'arg_schar', # 0 indexed
+        'arg_eline', # 0 indexed
+        'arg_echar', # 0 indexed
         'top',
         'uses_pos',
     )
