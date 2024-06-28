@@ -15,14 +15,17 @@
 			"args": [
 				"--lsp",
 				"--lsp-mode=tcp",
+				"--no-env-path",
 				"--lint",
 				"--strict",
 				"--canonical",
-				"--max-line-length=80",
-				"--max-identifier-length=32",
+				"--max-line-length=160",
+				"--max-identifier-length=64",
 				"--verbose",
-				"--no-env-path",
-				"--path=${workspaceFolder}/modules",
+				// "--path=${workspaceFolder}/modules",
+				// "--path=/home/esmasth/code/test-sdk/yang",
+				"--plugindir=/home/esmasth/code/pyanglint/src/pyangeydr",
+				"--ericsson",
 			]
 		},
 		{

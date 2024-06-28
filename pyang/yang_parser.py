@@ -192,6 +192,8 @@ class YangTokenizer(object):
                         strs.append((''.join(res), quote_char))
                         # and trim buf
                         self.set_buf(i+1)
+                        self.tquote_line = self.pos.line - 1
+                        self.tquote_char = self.offset
                         # check for '+' operator
                         self.skip()
                         if self.buf[0] == '+':
@@ -199,6 +201,8 @@ class YangTokenizer(object):
                             self.skip()
                             nstrs = self.get_strings(need_quote=True)
                             strs.extend(nstrs)
+                        self.string_eline = self.tquote_line
+                        self.string_echar = self.tquote_char
                         return strs
                     elif (quote_char == '"' and
                           self.buf[i] == '\\' and i < (buflen-1)):
@@ -273,6 +277,8 @@ class YangTokenizer(object):
                     self.buf[i:i+2] == '*/'):
                     res = self.buf[:i]
                     self.set_buf(i)
+                    self.string_eline = self.pos.line - 1
+                    self.string_echar = self.offset
                     return [(res, '')]
                 i = i + 1
 
@@ -331,10 +337,12 @@ class YangParser(object):
                     return stmt
 
         self.tokenizer.skip()
-        self.pos.kwd_sline = self.tokenizer.pos.line - 1
-        self.pos.kwd_schar = self.tokenizer.offset
+        self.pos.stmt_sline = self.tokenizer.pos.line - 1
+        self.pos.stmt_schar = self.tokenizer.offset
+        self.pos.kwd_sline = self.pos.stmt_sline
+        self.pos.kwd_schar = self.pos.stmt_schar
         keywd = self.tokenizer.get_keyword()
-        self.pos.kwd_eline = self.pos.line - 1
+        self.pos.kwd_eline = self.tokenizer.pos.line - 1
         self.pos.kwd_echar = self.tokenizer.offset
         # check for argument
         tok = self.tokenizer.peek()
@@ -346,8 +354,8 @@ class YangParser(object):
             self.pos.arg_sline = self.tokenizer.pos.line - 1
             self.pos.arg_schar = self.tokenizer.offset
             argstrs = self.tokenizer.get_strings()
-            self.pos.arg_eline = self.tokenizer.pos.line - 1
-            self.pos.arg_echar = self.tokenizer.offset
+            self.pos.arg_eline = self.tokenizer.string_eline
+            self.pos.arg_echar = self.tokenizer.string_echar
             arg = ''.join([a[0] for a in argstrs])
         # check for YANG 1.1
         if keywd == 'yang-version' and arg == '1.1':
@@ -377,6 +385,8 @@ class YangParser(object):
             error.err_add(self.ctx.errors, self.pos, 'INCOMPLETE_STATEMENT',
                           (keywd, tok))
             raise error.Abort
+        stmt.pos.stmt_eline = self.tokenizer.pos.line - 1
+        stmt.pos.stmt_echar = self.tokenizer.offset
         self.last_line = self.pos.line
         return stmt
 

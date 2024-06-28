@@ -552,6 +552,8 @@ def v_grammar_unique_defs(ctx, stmt):
     Called for every statement.
     Stores all typedefs in stmt.i_typedef, groupings in stmt.i_grouping
     """
+    if not hasattr(stmt, 'i_typedefs'):
+        return
     defs = [('typedef', 'TYPE_ALREADY_DEFINED', stmt.i_typedefs),
             ('grouping', 'GROUPING_ALREADY_DEFINED', stmt.i_groupings)]
     if stmt.parent is None:
@@ -2533,7 +2535,7 @@ def search_typedef(stmt, name):
     orig_stmt = stmt
     mod = stmt.i_orig_module
     while stmt is not None:
-        if name in stmt.i_typedefs:
+        if hasattr(stmt, 'i_typedefs') and name in stmt.i_typedefs:
             t = stmt.i_typedefs[name]
             if (mod is not None and
                 mod != t.i_orig_module and
