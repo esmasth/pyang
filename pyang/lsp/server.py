@@ -1,11 +1,16 @@
 """pyang LSP Server"""
 
 from __future__ import absolute_import
-import json
-import optparse
+import optparse  #pylint: disable=deprecated-module
 import os
 import tempfile
 from typing import Any, List, Union
+import importlib
+
+from lsprotocol import types as lsp
+from pygls.server import LanguageServer
+from pygls.workspace import TextDocument
+from pygls.uris import from_fs_path, to_fs_path
 
 from pyang import error, grammar
 from pyang import yang_parser
@@ -13,18 +18,11 @@ from pyang import context
 from pyang import plugin
 from pyang import syntax
 from pyang import statements
-from pyang.lsp import helper
-from pyang.lsp import glue
-from pyang.lsp.rfcref import rfcref_stmt_map, rfcref_type_map
+from pyang.plugins import lint
 from pyang.statements import Statement, ModSubmodStatement
 from pyang.translators import yang
-
-from lsprotocol import types as lsp
-from pygls.server import LanguageServer
-from pygls.workspace import TextDocument
-from pygls.uris import from_fs_path, to_fs_path
-
-import importlib
+from pyang.lsp import code_lens, folding_range, glue, completion, helper, inline_value, maps
+from pyang.lsp.rfcref import rfcref_stmt_map, rfcref_type_map
 
 ext_deps = ['pygls']
 def try_import_deps():
@@ -102,30 +100,6 @@ def add_opts(optparser: optparse.OptionParser):
 
 def gen_config_schema():
     return
-    with open('schema/pyangls.schema.json', mode='w') as schema_file:
-        schema = json.load(schema_file)
-        diagnostics = {}
-        def level_to_severity(level):
-            if error.is_warning(level):
-                return "info"
-            elif error.allow_warning(level):
-                return "warning"
-            else:
-                return "error"
-        for tag in error.error_codes:
-            (level, fmt) = error.error_codes[tag]
-            diagnostic = {
-                tag: {
-                    "description": fmt,
-                    "default": level_to_severity(level)
-                }
-            }
-            diagnostics.update(diagnostic)
-        schema['diagnostics'] = diagnostics
-        json.dump(obj=diagnostics,
-                  fp=schema_file,
-                  sort_keys=True,
-                  indent=2)
 
 
 def start_server(optargs, ctx: context.Context, fmts: dict):
@@ -180,15 +154,6 @@ def _update_ctx_modules():
         _add_to_ctx(text_doc)
 
 
-def _get_ctx_modules():
-    modules = []
-    for k in pyangls.ctx.modules:
-        m = pyangls.ctx.modules[k]
-        if m is not None:
-            modules.append(m)
-    return modules
-
-
 def _clear_stmt_validation(stmt: Statement):
     stmt.i_is_validated = False
     substmt : Statement
@@ -209,7 +174,7 @@ def _clear_ctx_validation():
 
 def _validate_ctx_modules():
     # ls.show_message_log("Validating YANG...")
-    modules = _get_ctx_modules()
+    modules = helper._get_ctx_modules(pyangls.ctx)
 
     p : plugin.PyangPlugin
 
@@ -235,7 +200,7 @@ def _build_doc_diagnostics(ref: str) -> List[lsp.Diagnostic]:
             continue
         msg = error.err_to_str(etag, eargs)
 
-        def epos_to_lsp_range(epos: error.Position) -> lsp.Range:
+        def epos_to_lsp_range(etag: str, epos: error.Position) -> lsp.Range:
             start_line = epos.arg_sline
             start_col = epos.arg_schar
             end_line = epos.arg_eline
@@ -247,7 +212,7 @@ def _build_doc_diagnostics(ref: str) -> List[lsp.Diagnostic]:
                 end_col = 0
             elif etag == 'LONG_IDENTIFIER' and pyangls.ctx.max_identifier_len is not None:
                 start_col = epos.arg_schar + pyangls.ctx.max_identifier_len
-            elif etag.__contains__('KEYWORD'):
+            elif 'KEYWORD' in etag:
                 start_line = epos.kwd_sline
                 start_col = epos.kwd_schar
                 end_line = epos.kwd_eline
@@ -257,7 +222,7 @@ def _build_doc_diagnostics(ref: str) -> List[lsp.Diagnostic]:
                 end=lsp.Position(line=end_line, character=end_col),
             )
 
-        def line_to_lsp_range(line) -> lsp.Range:
+        def line_to_lsp_range(etag: str, line: int) -> lsp.Range:
             # pyang just stores line context, not keyword/argument context
             start_line = line - 1
             if etag == 'LONG_LINE' and pyangls.ctx.max_line_len is not None:
@@ -310,7 +275,7 @@ def _build_doc_diagnostics(ref: str) -> List[lsp.Diagnostic]:
                 dup_arg = 3
                 dup_msg = 'Original Child'
             dup_uri = from_fs_path(eargs[dup_arg].ref)
-            dup_range = line_to_lsp_range(eargs[dup_arg].line)
+            dup_range = line_to_lsp_range(etag, eargs[dup_arg].line)
             if dup_uri:
                 dup_loc = lsp.Location(uri=dup_uri, range=dup_range)
                 rel_info.append(lsp.DiagnosticRelatedInformation(location=dup_loc,
@@ -319,13 +284,28 @@ def _build_doc_diagnostics(ref: str) -> List[lsp.Diagnostic]:
             # TODO: handle
             pass
 
+        code_desc = None
+        (_severity, _fmt, uri) = error.error_codes[etag]
+        if uri:
+            code_desc = lsp.CodeDescription(href=uri)
+        else:
+            if etag == 'LINT_MISSING_REQUIRED_SUBSTMT':
+                kwd = eargs[1]
+                (_stmts, _rfc_sec, uri) = lint._required_substatements[kwd]  #pylint: disable=protected-access
+                code_desc = lsp.CodeDescription(href=uri)
+            elif etag == 'LINT_MISSING_RECOMMENDED_SUBSTMT':
+                kwd = eargs[1]
+                (_stmts, _rfc_sec, uri) = lint._recommended_substatements[kwd]  #pylint: disable=protected-access
+                code_desc = lsp.CodeDescription(href=uri)
+
         d = lsp.Diagnostic(
-            range=epos_to_lsp_range(epos),
+            range=epos_to_lsp_range(etag, epos),
             message=msg,
             severity=level_to_lsp_severity(error.err_level(etag)),
             tags=diag_tags,
             related_information=rel_info,
             code=etag,
+            code_description=code_desc,
             source=SERVER_NAME,
         )
 
@@ -372,13 +352,13 @@ def _have_parser_errors() -> bool:
 
 
 def _format_yang(source: str, opts, module) -> str:
-    if opts.insert_spaces == False:
+    if opts.insert_spaces is False:
         pyangls.log_trace("insert_spaces is currently restricted to True")
     if opts.tab_size:
         pyangls.ctx.opts.yang_indent_size = opts.tab_size # type: ignore
-    if opts.trim_trailing_whitespace == False:
+    if opts.trim_trailing_whitespace is False:
         pyangls.log_trace("trim_trailing_whitespace is currently restricted to True")
-    if opts.trim_final_newlines == False:
+    if opts.trim_final_newlines is False:
         pyangls.log_trace("trim_final_newlines is currently restricted to True")
     pyangls.ctx.opts.yang_canonical = default_canonical_order # type: ignore
     pyangls.ctx.opts.yang_line_length = default_line_length # type: ignore
@@ -401,80 +381,8 @@ def _format_yang(source: str, opts, module) -> str:
     return fmt_text
 
 
-def _process_workspace_configuration(scope: str | None, config: List[Any]):
+def _process_workspace_configuration(_scope: str | None, _config: List[Any]):
     pass
-
-
-_leaf_lsp_symbol_kind = {
-    'uint8': lsp.SymbolKind.Number,
-    'uint16': lsp.SymbolKind.Number,
-    'uint32': lsp.SymbolKind.Number,
-    'uint64': lsp.SymbolKind.Number,
-    'int8': lsp.SymbolKind.Number,
-    'int16': lsp.SymbolKind.Number,
-    'int32': lsp.SymbolKind.Number,
-    'int64': lsp.SymbolKind.Number,
-    'decimal64': lsp.SymbolKind.Number,
-    'string': lsp.SymbolKind.String,
-    'boolean': lsp.SymbolKind.Boolean,
-    'enumeration': lsp.SymbolKind.Enum,
-    'bits': lsp.SymbolKind.Field,
-    'binary': lsp.SymbolKind.Field,
-    'union': lsp.SymbolKind.Null,
-    'leafref': lsp.SymbolKind.Null,
-    'identityref': lsp.SymbolKind.Object,
-}
-"""Static unconditional leaf keyword type mapping"""
-
-
-_lsp_symbol_kind = {
-    'module': lsp.SymbolKind.Module,
-    'submodule': lsp.SymbolKind.Module,
-    'yang-version': lsp.SymbolKind.Property,
-    'revision': lsp.SymbolKind.Property,
-    'contact': lsp.SymbolKind.Property,
-    'organization': lsp.SymbolKind.Property,
-    'description': lsp.SymbolKind.Property,
-    'reference': lsp.SymbolKind.Property,
-    'base': lsp.SymbolKind.Property,
-    'value': lsp.SymbolKind.Property,
-    'namespace': lsp.SymbolKind.Property,
-    'prefix': lsp.SymbolKind.Property,
-    'feature': lsp.SymbolKind.Boolean,
-    'if-feature': lsp.SymbolKind.Operator,
-    'when': lsp.SymbolKind.Operator,
-    'must': lsp.SymbolKind.Operator,
-    'choice': lsp.SymbolKind.Operator,
-    'case': lsp.SymbolKind.Operator,
-    'grouping': lsp.SymbolKind.Struct,
-    'extension': lsp.SymbolKind.Operator,
-    'key': lsp.SymbolKind.Key,
-    'identity': lsp.SymbolKind.Class,
-    'typedef': lsp.SymbolKind.TypeParameter,
-    'container': lsp.SymbolKind.Class,
-    'list': lsp.SymbolKind.Array,
-    'leaf-list': lsp.SymbolKind.Array,
-    'rpc': lsp.SymbolKind.Function,
-    'action': lsp.SymbolKind.Function,
-    'input': lsp.SymbolKind.Operator,
-    'output': lsp.SymbolKind.Operator,
-    'notification': lsp.SymbolKind.Event,
-    'enum': lsp.SymbolKind.EnumMember,
-    'value': lsp.SymbolKind.EnumMember,
-    'anyxml': lsp.SymbolKind.Variable,
-    'anydata': lsp.SymbolKind.Variable,
-    'augment': lsp.SymbolKind.Operator,
-    'deviation': lsp.SymbolKind.Operator,
-    'deviate': lsp.SymbolKind.Operator,
-    'config': lsp.SymbolKind.Property,
-    'mandatory': lsp.SymbolKind.Property,
-    'max-elements': lsp.SymbolKind.Property,
-    'min-elements': lsp.SymbolKind.Property,
-    'default': lsp.SymbolKind.Property,
-    'uses': lsp.SymbolKind.Operator,
-    'argument': lsp.SymbolKind.Property,
-}
-"""Static unconditional keyword mapping"""
 
 
 def _stmt_to_lsp_symbol_kind(stmt: Statement) -> lsp.SymbolKind:
@@ -485,14 +393,14 @@ def _stmt_to_lsp_symbol_kind(stmt: Statement) -> lsp.SymbolKind:
             match stmt.keyword:
                 case 'leaf':
                     def get_base_type(stmt: statements.Statement):
-                        type = stmt.search_one('type')
-                        if type:
-                            if type.arg in _leaf_lsp_symbol_kind.keys():
-                                return type.arg
-                            else:
-                                typedef = helper.ref_stmt_from_stmt_arg(pyangls.ctx, type)
-                                if typedef:
-                                    return get_base_type(typedef)
+                        stmt_type = stmt.search_one('type')
+                        if stmt_type:
+                            if stmt_type.arg in maps.type_lsp_kind:
+                                return stmt_type.arg
+                            typedef = helper.referenced_stmt_from_stmt_arg(pyangls.ctx, stmt_type)
+                            if typedef:
+                                return get_base_type(typedef)
+                        return None
 
                     def leaf_symbol_kind(
                         leaf: statements.LeafLeaflistStatement
@@ -501,25 +409,29 @@ def _stmt_to_lsp_symbol_kind(stmt: Statement) -> lsp.SymbolKind:
                         if not stmt_type:
                             return lsp.SymbolKind.Null
                         if stmt_type == 'leafref':
-                            if leaf.i_leafref_expanded:
+                            if hasattr(leaf, 'i_leafref_expanded') and leaf.i_leafref_expanded:
                                 (ref_stmt, _) = leaf.i_leafref_ptr
                             else:
+                                # TODO: check why i_leafref is not always populated
+                                if not hasattr(leaf, 'i_leafref'):
+                                    return lsp.SymbolKind.Null
                                 # TODO: check why i_leafref_ptr is not always populated
+                                if not leaf.i_leafref or not hasattr(leaf.i_leafref, 'i_target_node'):
+                                    return lsp.SymbolKind.Null
                                 ref_stmt = leaf.i_leafref.i_target_node
                             if not ref_stmt:
                                 return lsp.SymbolKind.Null
                             return leaf_symbol_kind(ref_stmt) # type: ignore
-                        else:
-                            try:
-                                return _leaf_lsp_symbol_kind[stmt_type]
-                            except KeyError:
-                                return lsp.SymbolKind.Field
+                        try:
+                            return maps.type_lsp_kind[stmt_type]['symbol']
+                        except KeyError:
+                            return lsp.SymbolKind.Field
 
                     return leaf_symbol_kind(stmt) # type: ignore
 
                 case _:
                     try:
-                        return _lsp_symbol_kind[stmt.keyword]
+                        return maps.keyword_lsp_kind[stmt.keyword]['symbol']
                     except KeyError:
                         return lsp.SymbolKind.Null
         case (str(), str()):
@@ -621,7 +533,7 @@ def _build_doc_stmt_symbols(
                     if deviated:
                         extra_detail += 'Δ'
                     break
-            if type(stmt.keyword) is str:
+            if isinstance(stmt.keyword, str):
                 symbol_detail = stmt.keyword
             else:
                 (prefix, keyword) = stmt.keyword
@@ -637,7 +549,7 @@ def _build_doc_stmt_symbols(
         # Handling extension statements
         symbol_detail = 'extension'
         assert stmt.keyword
-        if type(stmt.keyword) is str:
+        if isinstance(stmt.keyword, str):
             symbol_name = stmt.keyword
         else:
             (prefix, keyword) = stmt.keyword
@@ -651,7 +563,7 @@ def _build_doc_stmt_symbols(
     # Since pyang expansions have already been done, document external groupings
     # need to be resolved to the uses statement symbol and symbol selection.
     # For consistency, even document local groupings are handled the same way.
-    if hasattr(stmt, 'i_uses') and stmt.i_uses and stmt.i_uses_pos:
+    if not augmented and hasattr(stmt, 'i_uses') and stmt.i_uses and stmt.i_uses_pos:
         # TODO: Consider keeping direct references to file local groupings
         symbol_range = glue.stmt_lsp_range(stmt.i_uses_pos)
         symbol_select_range = glue.arg_lsp_selection_range(stmt.i_uses_pos)
@@ -686,8 +598,6 @@ def _build_doc_stmt_symbols(
             if symbols:
                 symbol_children.append(symbols)
 
-    # assert symbol_select_range.start.line >= symbol_range.start.line
-    # assert symbol_select_range.end.line <= symbol_range.end.line
     return lsp.DocumentSymbol(
         name=symbol_name,
         kind=symbol_kind,
@@ -716,7 +626,7 @@ def _build_ws_stmt_symbols(
     ctx_symbols = []
     container_name = None
     if stmt.arg:
-        if type(stmt.arg) is str:
+        if isinstance(stmt.arg, str):
             symbol_name = stmt.arg
             container_name = stmt.arg
         else:
@@ -744,7 +654,7 @@ def _build_ws_stmt_symbols(
                 ctx_symbols += symbols
 
     if stmt.arg:
-        if type(stmt.arg) is str:
+        if isinstance(stmt.arg, str):
             symbol_name = stmt.arg
             container_name = stmt.arg
         else:
@@ -786,68 +696,9 @@ def _build_ws_stmt_symbols(
     return ctx_symbols
 
 
-def find_grouping_uses(
-    grouping: statements.GroupingStatement,
-    stmt: statements.Statement,
-) -> List[statements.UsesStatement]:
-    uses: List[statements.UsesStatement] = []
-    if hasattr(stmt, 'i_grouping') and stmt.i_grouping == grouping: # type: ignore
-        uses.append(stmt) # type: ignore
-    for substmt in stmt.substmts:
-        uses.extend(find_grouping_uses(grouping, substmt))
-    return uses
-
-
-def find_module_import(
-    module: statements.ModSubmodStatement,
-    stmt: statements.ModSubmodStatement,
-) -> statements.ImportStatement | None:
-    substmt: statements.Statement
-    for substmt in stmt.substmts:
-        if substmt.keyword == 'import' and substmt.arg == module.arg:
-            revdate = substmt.search_one('revision-date')
-            if revdate and revdate != module.i_version:
-                continue
-            return substmt # type: ignore
-
-
-def find_feature_deps(
-    module: statements.Statement,
-    stmt: statements.Statement,
-) -> List[statements.Statement]:
-    deps = []
-    stmts = stmt.search('if-feature', arg=module.arg)
-    if stmts:
-        deps.extend(stmts)
-    for substmt in stmt.substmts:
-        deps.extend(find_feature_deps(module, substmt))
-    return deps
-
-
-def find_stmt_references(stmt: statements.Statement) -> List[statements.Statement]:
-    stmt_refs: List[statements.Statement] = []
-
-    for module in pyangls.modules.values():
-        match stmt.keyword:
-            case 'grouping':
-                stmt_refs.extend(find_grouping_uses(stmt, module)) # type: ignore
-            case 'module':
-                imp = find_module_import(stmt, module) # type: ignore
-                if imp:
-                    stmt_refs.append(imp)
-            case 'feature':
-                stmt_refs.extend(find_feature_deps(stmt, module)) # type: ignore
-            case 'leaf':
-                # stmt_refs.extend(find_leaf_refs(stmt, module)) # type: ignore
-                pass
-        # stmt_refs.extend(find_deviations(stmt, module)) # type: ignore
-    # key stmt is a reference as well
-    stmt_refs.append(stmt)
-    # TODO: Add all references in workspace
-    return stmt_refs
-
-
-def stmts_to_lsp_locations(stmts: List[statements.Statement]) -> List[lsp.Location]:
+def stmts_to_lsp_locations(
+    stmts: List[statements.Statement]
+) -> List[lsp.Location]:
     locs: List[lsp.Location] = []
     for stmt in stmts:
         stmt_uri = from_fs_path(stmt.pos.ref)
@@ -871,7 +722,7 @@ def stmts_to_lsp_locations(stmts: List[statements.Statement]) -> List[lsp.Locati
 @pyangls.feature(lsp.INITIALIZED)
 def initialized(
     ls: LanguageServer,
-    params: lsp.InitializedParams,
+    params: lsp.InitializedParams,  # pylint: disable=unused-argument
 ):
     """Handles LSP `initialized` notification."""
 
@@ -885,7 +736,7 @@ def initialized(
             if not yang_uri in ls.workspace.text_documents.keys():
                 yang_file = to_fs_path(yang_uri)
                 assert yang_file
-                with open(yang_file, 'r') as file:
+                with open(yang_file, 'r', encoding='utf-8') as file:
                     yang_source = file.read()
                     file.close()
                 ls.workspace.put_text_document(
@@ -998,12 +849,12 @@ def text_document_did_close(
 
 @pyangls.feature(lsp.TEXT_DOCUMENT_DEFINITION)
 def text_document_definition(
-    ls: LanguageServer,
+    ls: PyangLanguageServer,
     params: lsp.ReferenceParams
 ) -> Union[lsp.Definition, List[lsp.DefinitionLink], None]:
     """Handles LSP `textDocument/definition` request."""
 
-    module = pyangls.modules[params.text_document.uri]
+    module = ls.modules[params.text_document.uri]
     definition_uri = None
     origin_select_range = None
     match glue.stmt_from_lsp_position(module, params.position):
@@ -1021,13 +872,13 @@ def text_document_definition(
                     origin_selection_range=origin_select_range,
                 )
                 return [definition_link]
-            except:
+            except (KeyError, AttributeError):
                 pass
-            ref_stmt = helper.ext_stmt_from_stmt_kwd(pyangls.ctx, stmt)
+            ref_stmt = helper.ext_stmt_from_stmt_kwd(ls.ctx, stmt)
             if not ref_stmt:
                 return
-            for uri in pyangls.modules.keys():
-                if ref_stmt.top == pyangls.modules[uri]:
+            for uri, module in ls.modules.items():
+                if ref_stmt.top == module:
                     definition_uri = uri
                     break
         case (stmt, 'arg'):
@@ -1038,8 +889,16 @@ def text_document_definition(
                     ref_stmt = helper.get_augmented_stmt(aug)
                     if not ref_stmt:
                         return
-                    for uri in pyangls.modules.keys():
-                        if ref_stmt.top == pyangls.modules[uri]:
+                    for uri, module in ls.modules.items():
+                        if ref_stmt.top == module:
+                            definition_uri = uri
+                            break
+                case 'refine':
+                    ref_stmt = helper.get_refined_stmt(stmt)
+                    if not ref_stmt:
+                        return
+                    for uri, module in ls.modules.items():
+                        if ref_stmt.top == module:
                             definition_uri = uri
                             break
                 case 'deviation':
@@ -1047,24 +906,24 @@ def text_document_definition(
                     ref_stmt = helper.get_deviated_stmt(dev)
                     if not ref_stmt:
                         return
-                    for uri in pyangls.modules.keys():
-                        if ref_stmt.top == pyangls.modules[uri]:
+                    for uri, module in ls.modules.items():
+                        if ref_stmt.top == module:
                             definition_uri = uri
                             break
                 case 'path':
                     ref_stmt = helper.get_leafrefed_stmt(stmt)
                     if not ref_stmt:
                         return
-                    for uri in pyangls.modules.keys():
-                        if ref_stmt.top == pyangls.modules[uri]:
+                    for uri, module in ls.modules.items():
+                        if ref_stmt.top == module:
                             definition_uri = uri
                             break
                 case 'uses' | 'if-feature' | 'type' | 'base':
-                    ref_stmt = helper.ref_stmt_from_stmt_arg(pyangls.ctx, stmt)
+                    ref_stmt = helper.referenced_stmt_from_stmt_arg(ls.ctx, stmt)
                     if not ref_stmt:
                         return None
-                    for uri in pyangls.modules.keys():
-                        if ref_stmt.top == pyangls.modules[uri]:
+                    for uri, module in ls.modules.items():
+                        if ref_stmt.top == module:
                             definition_uri = uri
                             break
                 case 'import':
@@ -1072,10 +931,10 @@ def text_document_definition(
                     r = stmt.search_one('revision-date')
                     if r is not None:
                         revision = r.arg
-                    module = pyangls.ctx.get_module(stmt.arg, revision)
+                    module = ls.ctx.get_module(stmt.arg, revision)
                     if module:
-                        for uri in pyangls.modules.keys():
-                            ref_stmt = pyangls.modules[uri]
+                        for uri, module in ls.modules.items():
+                            ref_stmt = module
                             # TODO: handle multiple module revisions
                             if ref_stmt.arg == stmt.arg:
                                 definition_uri = uri
@@ -1083,17 +942,20 @@ def text_document_definition(
                 case 'key':
                     if stmt.arg:
                         keys = str(stmt.arg).split(' ')
-                        arglen = (stmt.pos.arg_echar - stmt.pos.arg_schar)
+                        arglen = stmt.pos.arg_echar - stmt.pos.arg_schar
                         quoted = 0
                         if len(keys) > 1 or \
                             (len(keys) == 1 and arglen == (len(keys[0]) + 2)):
                             quoted = 1
                         schar = stmt.pos.arg_schar + quoted
+                        key = None
                         for key in keys:
                             echar = schar + len(key)
                             if schar <= params.position.character < echar:
                                 break
                             schar += len(key) + 1
+                        if not key:
+                            return None
                         if hasattr(stmt.parent, 'i_key') and stmt.parent.i_key:
                             for ref_stmt in stmt.parent.i_key:
                                 if key == ref_stmt.arg:
@@ -1110,8 +972,8 @@ def text_document_definition(
                             start=lsp.Position(line=stmt.pos.arg_sline, character=schar),
                             end=lsp.Position(line=stmt.pos.arg_eline, character=echar),
                         )
-                        for uri in pyangls.modules.keys():
-                            if ref_stmt.top == pyangls.modules[uri]:
+                        for uri, module in ls.modules.items():
+                            if ref_stmt.top == module:
                                 definition_uri = uri
                                 break
                     if not ref_stmt:
@@ -1119,30 +981,39 @@ def text_document_definition(
                 case 'unique':
                     if stmt.arg:
                         uniques = str(stmt.arg).split(' ')
-                        arglen = (stmt.pos.arg_echar - stmt.pos.arg_schar)
+                        arglen = stmt.pos.arg_echar - stmt.pos.arg_schar
                         quoted = 0
                         if len(uniques) > 1 or \
                             (len(uniques) == 1 and arglen == (len(uniques[0]) + 2)):
                             quoted = 1
                         schar = stmt.pos.arg_schar + quoted
+                        unique = None
                         for unique in uniques:
                             echar = schar + len(unique)
                             if schar <= params.position.character < echar:
                                 break
                             schar += len(unique) + 1
+                        if not unique:
+                            return None
                         for i_unique in stmt.parent.i_unique:
                             (_, unique_stmts) = i_unique
                             for ref_stmt in unique_stmts:
                                 if unique == ref_stmt.arg:
                                     origin_select_range = lsp.Range(
-                                        start=lsp.Position(line=stmt.pos.arg_sline, character=schar),
-                                        end=lsp.Position(line=stmt.pos.arg_eline, character=echar),
+                                        start=lsp.Position(
+                                            line=stmt.pos.arg_sline,
+                                            character=schar,
+                                        ),
+                                        end=lsp.Position(
+                                            line=stmt.pos.arg_eline,
+                                            character=echar,
+                                        ),
                                     )
                                     break
                         if not ref_stmt:
                             return None
-                        for uri in pyangls.modules.keys():
-                            if ref_stmt.top == pyangls.modules[uri]:
+                        for uri, module in ls.modules.items():
+                            if ref_stmt.top == module:
                                 definition_uri = uri
                                 break
                     if not ref_stmt:
@@ -1175,7 +1046,7 @@ def text_document_definition(
 
 @pyangls.feature(lsp.TEXT_DOCUMENT_TYPE_DEFINITION)
 def text_document_type_definition(
-    ls: LanguageServer,
+    _ls: LanguageServer,
     params: lsp.TypeDefinitionParams
 ) -> Union[lsp.Definition, List[lsp.DefinitionLink], None]:
     """Handles LSP `textDocument/typeDefinition` request."""
@@ -1195,14 +1066,17 @@ def text_document_type_definition(
         elif len(prefix_parts) == 2:
             typedef_name = prefix_parts[1]
             imp_mods = module.search('import')
+            imp_mod = None
             for imp_mod in imp_mods:
                 imp_prefix = imp_mod.search_one('prefix')
                 if imp_prefix.arg == prefix_parts[0]:
                     break
+            if not imp_mod:
+                return None
             typedef_module = None
-            for uri in pyangls.modules.keys():
-                typedef_module = pyangls.modules[uri]
-                if pyangls.modules[uri].arg == imp_mod.arg:
+            for uri, module in pyangls.modules.items():
+                typedef_module = module
+                if module.arg == imp_mod.arg:
                     typedef_uri = uri
                     break
         else:
@@ -1231,15 +1105,21 @@ def text_document_type_definition(
 
 @pyangls.feature(lsp.TEXT_DOCUMENT_REFERENCES)
 def text_document_references(
-    ls: LanguageServer,
+    ls: PyangLanguageServer,
     params: lsp.ReferenceParams
 ) -> Union[List[lsp.Location], None]:
     """Handles LSP `textDocument/references` request."""
 
-    module = pyangls.modules[params.text_document.uri]
+    module = ls.modules[params.text_document.uri]
     match glue.stmt_from_lsp_position(module, params.position):
         case (stmt, 'arg'):
-            ref_stmts = find_stmt_references(stmt)
+            ref_stmts = helper.find_stmt_references(ls.ctx, stmt)
+            match stmt.keyword:
+                case 'path' | 'augment' | 'deviation':
+                    pass
+                case _:
+                    # lookup stmt is a reference as well
+                    ref_stmts.append(stmt)
         case _:
             return None
     return stmts_to_lsp_locations(ref_stmts)
@@ -1250,12 +1130,12 @@ def text_document_references(
 
 @pyangls.feature(lsp.TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT)
 def text_document_document_highlight(
-    ls: LanguageServer,
+    ls: PyangLanguageServer,
     params: lsp.DocumentHighlightParams
 ) -> Union[List[lsp.DocumentHighlight], None]:
     """Handles LSP `textDocument/documentHighlight` notification."""
 
-    module = pyangls.modules[params.text_document.uri]
+    module = ls.modules[params.text_document.uri]
     match glue.stmt_from_lsp_position(module, params.position):
         case (stmt, 'kwd'):
             highlight_range = glue.kwd_lsp_selection_range(stmt.pos)
@@ -1272,12 +1152,13 @@ def text_document_document_highlight(
                     highlight_kind = lsp.DocumentHighlightKind.Read
                     if stmt.arg:
                         keys = str(stmt.arg).split(' ')
-                        arglen = (stmt.pos.arg_echar - stmt.pos.arg_schar)
+                        arglen = stmt.pos.arg_echar - stmt.pos.arg_schar
                         quoted = 0
                         if len(keys) > 1 or \
                             (len(keys) == 1 and arglen == (len(keys[0]) + 2)):
                             quoted = 1
                         schar = stmt.pos.arg_schar + quoted
+                        key = None
                         for key in keys:
                             echar = schar + len(key)
                             if schar <= params.position.character < echar:
@@ -1301,12 +1182,13 @@ def text_document_document_highlight(
                     highlight_kind = lsp.DocumentHighlightKind.Read
                     if stmt.arg:
                         uniques = str(stmt.arg).split(' ')
-                        arglen = (stmt.pos.arg_echar - stmt.pos.arg_schar)
+                        arglen = stmt.pos.arg_echar - stmt.pos.arg_schar
                         quoted = 0
                         if len(uniques) > 1 or \
                             (len(uniques) == 1 and arglen == (len(uniques[0]) + 2)):
                             quoted = 1
                         schar = stmt.pos.arg_schar + quoted
+                        unique = None
                         for unique in uniques:
                             echar = schar + len(unique)
                             if schar <= params.position.character < echar:
@@ -1342,12 +1224,12 @@ def text_document_document_highlight(
 
 @pyangls.feature(lsp.TEXT_DOCUMENT_HOVER)
 def text_document_hover(
-    ls: LanguageServer,
+    ls: PyangLanguageServer,
     params: lsp.HoverParams
 ) -> lsp.Hover:
     """Handles LSP `textDocument/hover` request."""
 
-    module = pyangls.modules[params.text_document.uri]
+    module = ls.modules[params.text_document.uri]
 
     hover_value = ''
 
@@ -1357,7 +1239,7 @@ def text_document_hover(
         return current + value
 
     def append_ref_info(current: str, stmt: Statement) -> str:
-        ref_stmt = helper.ref_stmt_from_stmt_arg(pyangls.ctx, stmt)
+        ref_stmt = helper.referenced_stmt_from_stmt_arg(ls.ctx, stmt)
         if ref_stmt:
             desc = statements.get_description(ref_stmt)
             if desc and desc.strip() != '':
@@ -1395,7 +1277,7 @@ def text_document_hover(
                         hover_value = append_hover(hover_value, rfcref_value(kwd_rfcref))
                     case _:
                         # not an inbuilt keyword
-                        ext_stmt = helper.ext_stmt_from_stmt_kwd(pyangls.ctx, stmt)
+                        ext_stmt = helper.ext_stmt_from_stmt_kwd(ls.ctx, stmt)
                         if ext_stmt:
                             # extension
                             desc = statements.get_description(ext_stmt)
@@ -1406,15 +1288,14 @@ def text_document_hover(
         case (stmt, 'arg'):
             desc = statements.get_description(stmt)
             if desc and desc.strip() != '':
-                hover_value = append_hover(hover_value, desc)
+                if stmt.keyword == 'refine':
+                    value = '**refined**: ' + desc
+                else:
+                    value = desc
+                hover_value = append_hover(hover_value, value)
             ref = helper.get_reference(stmt)
             if ref and ref.strip() != '':
                 hover_value += '\n\n*See*: ' + ref
-            ref_stmt_map = {
-                'augment': lambda x: helper.get_augmented_stmt(x),
-                'deviation': lambda x: helper.get_deviated_stmt(x),
-                'path': lambda x: helper.get_leafrefed_stmt(x),
-            }
             match stmt.keyword:
                 case 'augment':
                     aug: statements.AugmentStatement = stmt # type: ignore
@@ -1423,6 +1304,16 @@ def text_document_hover(
                         desc = statements.get_description(aug_stmt)
                         if desc and desc.strip() != '':
                             value = '**' + aug_stmt.keyword + '**: ' + desc
+                            hover_value = append_hover(hover_value, value)
+                case 'refine':
+                    ref_stmt = helper.get_refined_stmt(stmt)
+                    if ref_stmt and hasattr(ref_stmt, 'i_refined'):
+                        if 'description' in ref_stmt.i_refined:
+                            desc = ref_stmt.i_refined['description']
+                        else:
+                            desc = statements.get_description(ref_stmt)
+                        if desc and desc.strip() != '':
+                            value = '**original**: ' + desc
                             hover_value = append_hover(hover_value, value)
                 case 'deviation':
                     dev: statements.DeviationStatement = stmt # type: ignore
@@ -1446,7 +1337,7 @@ def text_document_hover(
                     r = stmt.search_one('revision-date')
                     if r is not None:
                         revision = r.arg
-                    module = pyangls.ctx.get_module(stmt.arg, revision)
+                    module = ls.ctx.get_module(stmt.arg, revision)
                     if module:
                         desc = statements.get_description(module)
                         if desc:
@@ -1459,15 +1350,30 @@ def text_document_hover(
                     except KeyError:
                         # not an inbuilt type
                         hover_value = append_ref_info(hover_value, stmt)
+                case 'default':
+                    type_ = stmt.parent.search_one('type')
+                    desc_stmt = None
+                    match type_.arg:
+                        case 'enumeration':
+                            for substmt in type_.substmts:
+                                if substmt.keyword == 'enum' and substmt.arg == stmt.arg:
+                                    desc_stmt = substmt
+                                    break
+                    if desc_stmt:
+                        desc = statements.get_description(desc_stmt)
+                        if desc:
+                            value = '**' + desc_stmt.keyword + '**: ' + desc
+                            hover_value = append_hover(hover_value, value)
                 case 'key':
                     if stmt.arg:
                         keys = str(stmt.arg).split(' ')
-                        arglen = (stmt.pos.arg_echar - stmt.pos.arg_schar)
+                        arglen = stmt.pos.arg_echar - stmt.pos.arg_schar
                         quoted = 0
                         if len(keys) > 1 or \
                             (len(keys) == 1 and arglen == (len(keys[0]) + 2)):
                             quoted = 1
                         schar = stmt.pos.arg_schar + quoted
+                        key = None
                         for key in keys:
                             echar = schar + len(key)
                             if schar <= params.position.character < echar:
@@ -1496,30 +1402,38 @@ def text_document_hover(
                 case 'unique':
                     if stmt.arg:
                         uniques = str(stmt.arg).split(' ')
-                        arglen = (stmt.pos.arg_echar - stmt.pos.arg_schar)
+                        arglen = stmt.pos.arg_echar - stmt.pos.arg_schar
                         quoted = 0
                         if len(uniques) > 1 or \
                             (len(uniques) == 1 and arglen == (len(uniques[0]) + 2)):
                             quoted = 1
                         schar = stmt.pos.arg_schar + quoted
+                        unique = None
                         for unique in uniques:
                             echar = schar + len(unique)
                             if schar <= params.position.character < echar:
                                 break
                             schar += len(unique) + 1
-                        for i_unique in stmt.parent.i_unique:
-                            (_, unique_stmts) = i_unique
-                            for unique_stmt in unique_stmts:
-                                if unique == unique_stmt.arg:
-                                    desc = statements.get_description(unique_stmt)
-                                    if desc and desc.strip() != '':
-                                        value = '**leaf**: ' + desc
-                                        hover_value = append_hover(hover_value, value)
-                                    hover_range = lsp.Range(
-                                        start=lsp.Position(line=stmt.pos.arg_sline, character=schar),
-                                        end=lsp.Position(line=stmt.pos.arg_eline, character=echar),
-                                    )
-                                    break
+                        if unique:
+                            for i_unique in stmt.parent.i_unique:
+                                (_, unique_stmts) = i_unique
+                                for unique_stmt in unique_stmts:
+                                    if unique == unique_stmt.arg:
+                                        desc = statements.get_description(unique_stmt)
+                                        if desc and desc.strip() != '':
+                                            value = '**leaf**: ' + desc
+                                            hover_value = append_hover(hover_value, value)
+                                        hover_range = lsp.Range(
+                                            start=lsp.Position(
+                                                line=stmt.pos.arg_sline,
+                                                character=schar,
+                                            ),
+                                            end=lsp.Position(
+                                                line=stmt.pos.arg_eline,
+                                                character=echar,
+                                            ),
+                                        )
+                                        break
             if not hover_range:
                 hover_range = glue.arg_lsp_selection_range(stmt.pos)
         case _:
@@ -1537,10 +1451,38 @@ def text_document_hover(
 ################################################################################
 
 
+@pyangls.feature(lsp.TEXT_DOCUMENT_CODE_LENS)
+def text_document_code_lens(
+    ls: PyangLanguageServer,
+    params: lsp.CodeLensParams,
+) -> Union[List[lsp.CodeLens], None]:
+    module = ls.modules[params.text_document.uri]
+    if not module:
+        return None
+    return code_lens.build_list(ls.ctx, module, params.text_document.uri)
+
+
+################################################################################
+
+
+@pyangls.feature(lsp.TEXT_DOCUMENT_FOLDING_RANGE)
+def text_document_folding_range(
+    ls: PyangLanguageServer,
+    params: lsp.FoldingRangeParams,
+) -> Union[List[lsp.FoldingRange], None]:
+    module = ls.modules[params.text_document.uri]
+    if not module:
+        return None
+    return folding_range.build_list(module)
+
+
+################################################################################
+
+
 @pyangls.feature(lsp.TEXT_DOCUMENT_DOCUMENT_SYMBOL)
 async def text_document_document_symbol(
     ls: PyangLanguageServer,
-    params: lsp.DocumentSymbolParams
+    params: lsp.DocumentSymbolParams,
 ) -> List[lsp.DocumentSymbol] | None:
     """Handles LSP `textDocument/documentSymbol` request."""
 
@@ -1567,6 +1509,37 @@ async def text_document_document_symbol(
             document_symbols.append(module_symbols)
     pyangls.doc_symbols[params.text_document.uri] = document_symbols
     return document_symbols
+
+
+################################################################################
+
+
+@pyangls.feature(lsp.TEXT_DOCUMENT_INLINE_VALUE)
+def text_document_inline_value(
+    ls: PyangLanguageServer,
+    params: lsp.InlineValueParams,
+) -> Union[List[lsp.InlineValueText], None]:
+    module = ls.modules[params.text_document.uri]
+    if not module:
+        return None
+    return inline_value.build_list(module, params.text_document.uri)
+
+
+################################################################################
+
+
+@pyangls.feature(
+    lsp.TEXT_DOCUMENT_COMPLETION,
+    lsp.CompletionOptions(trigger_characters=completion.trigger_characters),
+)
+def text_document_completion(
+    ls: PyangLanguageServer,
+    params: lsp.CompletionParams,
+) -> Union[List[lsp.CompletionItem], lsp.CompletionList, None]:
+    module = ls.modules[params.text_document.uri]
+    if not module:
+        return None
+    return completion.build_list(ls.ctx, module, params.position)
 
 
 ################################################################################
@@ -1613,8 +1586,11 @@ def workspace_diagnostic(
     """Handles LSP `workspace/diagnostic` request."""
 
     if pyangls.client_capabilities.text_document is None or \
-        pyangls.client_capabilities.text_document.diagnostic is None:
+            pyangls.client_capabilities.text_document.diagnostic is None:
         pyangls.show_message("Unexpected workspace/diagnostic from incapable client.")
+
+    if params.identifier:
+        pyangls.log_trace(params.identifier)
 
     items : List[lsp.WorkspaceDocumentDiagnosticReport] = []
     for text_doc_uri in pyangls.workspace.text_documents.keys():
@@ -1711,7 +1687,7 @@ def workspace_did_change_configuration(
             if not yang_uri in ls.workspace.text_documents.keys():
                 yang_file = to_fs_path(yang_uri)
                 assert yang_file
-                with open(yang_file, 'r') as file:
+                with open(yang_file, 'r', encoding='utf-8') as file:
                     yang_source = file.read()
                     file.close()
                 ls.workspace.put_text_document(
@@ -1755,7 +1731,7 @@ def workspace_did_change_watched_files(
         if event.type == lsp.FileChangeType.Created:
             yang_file = to_fs_path(event.uri)
             assert yang_file
-            with open(yang_file, 'r') as file:
+            with open(yang_file, 'r', encoding='utf-8') as file:
                 yang_source = file.read()
                 file.close()
             ls.workspace.put_text_document(

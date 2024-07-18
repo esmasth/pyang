@@ -82,7 +82,7 @@ def v_xpath(ctx, stmt, node):
         else:
             q = xpath_parser.parse(stmt.arg)
             stmt.i_xpath = q
-        chk_xpath_expr(ctx, stmt.i_orig_module, stmt.pos, node, node, q, None)
+        chk_xpath_expr(ctx, stmt, node, node, q, None)
     except xpath_lexer.XPathError as e:
         err_add(ctx.errors, stmt.pos, 'XPATH_SYNTAX_ERROR', e.msg)
         stmt.i_xpath = None
@@ -92,35 +92,40 @@ def v_xpath(ctx, stmt, node):
 
 # mod is the (sub)module where the stmt is defined, which we use to
 # resolve prefixes.
-def chk_xpath_expr(ctx, mod, pos, initial, node, q, t):
+def chk_xpath_expr(ctx, ref_stmt, initial, node, q, t):
+    mod = ref_stmt.i_orig_module
+    pos = ref_stmt.pos
     if isinstance(q, list):
-        chk_xpath_path(ctx, mod, pos, initial, node, q)
+        chk_xpath_path(ctx, ref_stmt, initial, node, q)
     elif isinstance(q, tuple):
         if q[0] == 'absolute':
-            chk_xpath_path(ctx, mod, pos, initial, 'root', q[1])
+            chk_xpath_path(ctx, ref_stmt, initial, 'root', q[1])
         elif q[0] == 'relative':
-            chk_xpath_path(ctx, mod, pos, initial, node, q[1])
+            stmt = chk_xpath_path(ctx, ref_stmt, initial, node, q[1])
+            # referencing node is whole statement, hence added one per statement
+            if stmt and hasattr(stmt, 'i_referencing_nodes') and ref_stmt not in stmt.i_referencing_nodes:
+                stmt.i_referencing_nodes.append(ref_stmt)
         elif q[0] == 'union':
             for qa in q[1]:
-                chk_xpath_path(ctx, mod, pos, initial, node, qa)
+                chk_xpath_path(ctx, ref_stmt, initial, node, qa)
         elif q[0] == 'comp':
-            chk_xpath_expr(ctx, mod, pos, initial, node, q[2], None)
-            chk_xpath_expr(ctx, mod, pos, initial, node, q[3], None)
+            chk_xpath_expr(ctx, ref_stmt, initial, node, q[2], None)
+            chk_xpath_expr(ctx, ref_stmt, initial, node, q[3], None)
         elif q[0] == 'arith':
-            chk_xpath_expr(ctx, mod, pos, initial, node, q[2], None)
-            chk_xpath_expr(ctx, mod, pos, initial, node, q[3], None)
+            chk_xpath_expr(ctx, ref_stmt, initial, node, q[2], None)
+            chk_xpath_expr(ctx, ref_stmt, initial, node, q[3], None)
         elif q[0] == 'bool':
-            chk_xpath_expr(ctx, mod, pos, initial, node, q[2], None)
-            chk_xpath_expr(ctx, mod, pos, initial, node, q[3], None)
+            chk_xpath_expr(ctx, ref_stmt, initial, node, q[2], None)
+            chk_xpath_expr(ctx, ref_stmt, initial, node, q[3], None)
         elif q[0] == 'negative':
-            chk_xpath_expr(ctx, mod, pos, initial, node, q[1], None)
+            chk_xpath_expr(ctx, ref_stmt, initial, node, q[1], None)
         elif q[0] == 'function_call':
-            chk_xpath_function(ctx, mod, pos, initial, node, q[1], q[2])
+            chk_xpath_function(ctx, ref_stmt, initial, node, q[1], q[2])
         elif q[0] == 'path_expr':
-            chk_xpath_expr(ctx, mod, pos, initial, node, q[1], t)
+            chk_xpath_expr(ctx, ref_stmt, initial, node, q[1], t)
         elif q[0] == 'path': # q[1] == 'filter'
-            chk_xpath_expr(ctx, mod, pos, initial, node, q[2], None)
-            chk_xpath_expr(ctx, mod, pos, initial, node, q[3], None)
+            chk_xpath_expr(ctx, ref_stmt, initial, node, q[2], None)
+            chk_xpath_expr(ctx, ref_stmt, initial, node, q[3], None)
         elif q[0] == 'var':
             # NOTE: check if the variable is known; currently we don't
             # have any variables in YANG xpath expressions
@@ -154,7 +159,9 @@ def chk_xpath_expr(ctx, mod, pos, initial, node, q, t):
                                 err_add(ctx.errors, pos0,
                                         'WPREFIX_NOT_DEFINED', arg)
 
-def chk_xpath_function(ctx, mod, pos, initial, node, func, args):
+def chk_xpath_function(ctx, ref_stmt, initial, node, func, args):
+    mod = ref_stmt.i_orig_module
+    pos = ref_stmt.pos
     signature = None
     if func in core_functions:
         signature = core_functions[func]
@@ -196,7 +203,7 @@ def chk_xpath_function(ctx, mod, pos, initial, node, func, args):
     args_signature = signature[0][:]
     if func == 'deref':
         arg = args[0]
-        tgt = chk_xpath_path(ctx, mod, pos, initial, node, arg)
+        tgt = chk_xpath_path(ctx, ref_stmt, initial, node, arg)
 
         if tgt is not None:
             if not hasattr(tgt, 'i_leafref_ptr') or tgt.i_leafref_ptr is None:
@@ -210,18 +217,20 @@ def chk_xpath_function(ctx, mod, pos, initial, node, func, args):
         return (signature[1], tgt)
     else:
         for arg in args:
-            chk_xpath_expr(ctx, mod, pos, initial, node, arg, args_signature[i])
+            chk_xpath_expr(ctx, ref_stmt, initial, node, arg, args_signature[i])
             if args_signature[i] == '*':
                 args_signature.append('*')
             i = i + 1
         return (signature[1], None)
 
-def chk_xpath_path(ctx, mod, pos, initial, node, path):
+def chk_xpath_path(ctx, ref_stmt, initial, node, path):
+    mod = ref_stmt.i_orig_module
+    pos = ref_stmt.pos
     if len(path) == 0:
         return node
     head = path[0]
     if head == 'relative':
-        return chk_xpath_path(ctx, mod, pos, initial, node, path[1])
+        return chk_xpath_path(ctx, ref_stmt, initial, node, path[1])
     if head[0] == 'var':
         # check if the variable is known as a node-set
         # currently we don't have any variables, so this fails
@@ -229,7 +238,7 @@ def chk_xpath_path(ctx, mod, pos, initial, node, path):
     elif head[0] == 'function_call':
         func = head[1]
         args = head[2]
-        (rettype, tgt) = chk_xpath_function(ctx, mod, pos, initial,
+        (rettype, tgt) = chk_xpath_function(ctx, ref_stmt, initial,
                                             node, func, args)
         if rettype is not None:
             # known function, check that it returns a node set
@@ -237,12 +246,12 @@ def chk_xpath_path(ctx, mod, pos, initial, node, path):
                 err_add(ctx.errors, pos, 'XPATH_FUNCTION_RET_VAL',
                         (func, 'node-set'))
         if func == 'current':
-            return chk_xpath_path(ctx, mod, pos, initial, initial, path[1:])
+            return chk_xpath_path(ctx, ref_stmt, initial, initial, path[1:])
         elif func == 'deref':
             t = None
             if tgt is not None:
                 (t, _pos) = tgt.i_leafref_ptr
-            return chk_xpath_path(ctx, mod, pos, initial, t, path[1:])
+            return chk_xpath_path(ctx, ref_stmt, initial, t, path[1:])
     elif head[0] == 'step':
         axis = head[1]
         nodetest = head[2]
@@ -250,7 +259,6 @@ def chk_xpath_path(ctx, mod, pos, initial, node, path):
         node1 = None
         if axis == 'self':
             node1 = node
-            pass
         elif nodetest[0] == 'name':
             prefix = nodetest[1]
             name = nodetest[2]
@@ -347,5 +355,5 @@ def chk_xpath_path(ctx, mod, pos, initial, node, path):
             # validate functions etc.
             pass
         for p in preds:
-            chk_xpath_expr(ctx, mod, pos, initial, node1, p, None)
-        return chk_xpath_path(ctx, mod, pos, initial, node1, path[1:])
+            chk_xpath_expr(ctx, ref_stmt, initial, node1, p, None)
+        return chk_xpath_path(ctx, ref_stmt, initial, node1, path[1:])

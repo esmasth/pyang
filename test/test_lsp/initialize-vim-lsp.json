@@ -1,0 +1,228 @@
+{
+	"rootUri": "file:///home/esmasth",
+	"capabilities": {
+		"workspace": {
+			"workspaceFolders": false,
+			"configuration": true,
+			"symbol": {
+				"dynamicRegistration": false
+			},
+			"applyEdit": true
+		},
+		"window": {
+			"workDoneProgress": false
+		},
+		"textDocument": {
+			"callHierarchy": {
+				"dynamicRegistration": false
+			},
+			"rename": {
+				"prepareSupport": true,
+				"dynamicRegistration": false,
+				"prepareSupportDefaultBehavior": 1
+			},
+			"codeAction": {
+				"isPreferredSupport": true,
+				"disabledSupport": true,
+				"codeActionLiteralSupport": {
+					"codeActionKind": {
+						"valueSet": [
+							"",
+							"quickfix",
+							"refactor",
+							"refactor.extract",
+							"refactor.inline",
+							"refactor.rewrite",
+							"source",
+							"source.organizeImports"
+						]
+					}
+				},
+				"dynamicRegistration": false
+			},
+			"completion": {
+				"completionItem": {
+					"snippetSupport": false,
+					"resolveSupport": {
+						"properties": [
+							"additionalTextEdits"
+						]
+					},
+					"documentationFormat": [
+						"markdown",
+						"plaintext"
+					]
+				},
+				"dynamicRegistration": false,
+				"completionItemKind": {
+					"valueSet": [
+						10,
+						11,
+						12,
+						13,
+						14,
+						15,
+						16,
+						17,
+						18,
+						19,
+						20,
+						21,
+						22,
+						23,
+						24,
+						25,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9
+					]
+				}
+			},
+			"formatting": {
+				"dynamicRegistration": false
+			},
+			"codeLens": {
+				"dynamicRegistration": false
+			},
+			"inlayHint": {
+				"dynamicRegistration": false
+			},
+			"hover": {
+				"dynamicRegistration": false,
+				"contentFormat": [
+					"markdown",
+					"plaintext"
+				]
+			},
+			"rangeFormatting": {
+				"dynamicRegistration": false
+			},
+			"declaration": {
+				"dynamicRegistration": false,
+				"linkSupport": true
+			},
+			"references": {
+				"dynamicRegistration": false
+			},
+			"typeHierarchy": {
+				"dynamicRegistration": false
+			},
+			"foldingRange": {
+				"rangeLimit": 5000,
+				"dynamicRegistration": false,
+				"lineFoldingOnly": true
+			},
+			"documentSymbol": {
+				"symbolKind": {
+					"valueSet": [
+						10,
+						11,
+						12,
+						13,
+						14,
+						15,
+						16,
+						17,
+						18,
+						19,
+						20,
+						21,
+						22,
+						23,
+						24,
+						25,
+						26,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9
+					]
+				},
+				"dynamicRegistration": false,
+				"labelSupport": false,
+				"hierarchicalDocumentSymbolSupport": false
+			},
+			"publishDiagnostics": {
+				"relatedInformation": true
+			},
+			"synchronization": {
+				"dynamicRegistration": false,
+				"willSaveWaitUntil": false,
+				"willSave": false,
+				"didSave": true
+			},
+			"documentHighlight": {
+				"dynamicRegistration": false
+			},
+			"implementation": {
+				"dynamicRegistration": false,
+				"linkSupport": true
+			},
+			"typeDefinition": {
+				"dynamicRegistration": false,
+				"linkSupport": true
+			},
+			"semanticTokens": {
+				"serverCancelSupport": false,
+				"requests": {
+					"full": false,
+					"range": false
+				},
+				"multilineTokenSupport": false,
+				"dynamicRegistration": false,
+				"overlappingTokenSupport": false,
+				"tokenTypes": [
+					"type",
+					"class",
+					"enum",
+					"interface",
+					"struct",
+					"typeParameter",
+					"parameter",
+					"variable",
+					"property",
+					"enumMember",
+					"event",
+					"function",
+					"method",
+					"macro",
+					"keyword",
+					"modifier",
+					"comment",
+					"string",
+					"number",
+					"regexp",
+					"operator"
+				],
+				"tokenModifiers": [],
+				"formats": [
+					"relative"
+				]
+			},
+			"signatureHelp": {
+				"dynamicRegistration": false
+			},
+			"definition": {
+				"dynamicRegistration": false,
+				"linkSupport": true
+			}
+		}
+	},
+	"rootPath": "/home/esmasth",
+	"clientInfo": {
+		"name": "vim-lsp"
+	},
+	"processId": 23465,
+	"trace": "off"
+}

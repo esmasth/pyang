@@ -137,7 +137,8 @@ class LintPlugin(plugin.PyangPlugin):
         error.add_error_code(
             'LINT_EXPLICIT_DEFAULT', 4,
             'RFC 8407: 4.4: '
-            + 'statement "%s" is given with its default value "%s"')
+            + 'statement "%s" is given with its default value "%s"',
+            'https://datatracker.ietf.org/doc/html/rfc8407#section-4.4')
         error.add_error_code(
             'LINT_MISSING_REQUIRED_SUBSTMT', 3,
             '%s: '
@@ -148,24 +149,29 @@ class LintPlugin(plugin.PyangPlugin):
             + 'statement "%s" should have a "%s" substatement')
         error.add_error_code(
             'LINT_BAD_NAMESPACE_VALUE', 4,
-            'RFC 8407: 4.9: namespace value should be "%s"')
+            'RFC 8407: 4.9: namespace value should be "%s"',
+            'https://datatracker.ietf.org/doc/html/rfc8407#section-4.9')
         error.add_error_code(
             'LINT_BAD_MODULENAME_PREFIX_1', 4,
             'RFC 8407: 4.1: '
-            + 'the module name should start with the string %s')
+            + 'the module name should start with the string %s',
+            'https://datatracker.ietf.org/doc/html/rfc8407#section-4.1')
         error.add_error_code(
             'LINT_BAD_MODULENAME_PREFIX_N', 4,
             'RFC 8407: 4.1: '
-            + 'the module name should start with one of the strings %s')
+            + 'the module name should start with one of the strings %s',
+            'https://datatracker.ietf.org/doc/html/rfc8407#section-4.1')
         error.add_error_code(
             'LINT_NO_MODULENAME_PREFIX', 4,
             'RFC 8407: 4.1: '
-            + 'no module name prefix string used')
+            + 'no module name prefix string used',
+            'https://datatracker.ietf.org/doc/html/rfc8407#section-4.1')
         error.add_error_code(
             'LINT_BAD_REVISION', 3,
             'RFC 8407: 4.7: '
             + 'the module\'s revision %s is older than '
-            + 'submodule %s\'s revision %s')
+            + 'submodule %s\'s revision %s',
+            'https://datatracker.ietf.org/doc/html/rfc8407#section-4.7')
         error.add_error_code(
             'LINT_TOP_MANDATORY', 3,
             'RFC 8407: 4.10: '
@@ -177,7 +183,8 @@ class LintPlugin(plugin.PyangPlugin):
         # override std error string
         error.add_error_code(
             'LONG_IDENTIFIER', 3,
-            'RFC 8407: 4.3: identifier %s exceeds %s characters')
+            'RFC 8407: 4.3: identifier %s exceeds %s characters',
+            'https://datatracker.ietf.org/doc/html/rfc8407#section-4.3')
 
 _keyword_with_default = {
     'status': 'current',
@@ -190,29 +197,65 @@ _keyword_with_default = {
 
 _required_substatements = {
     'module': (('contact', 'organization', 'description', 'revision'),
-               "RFC 8407: 4.8"),
+               "RFC 8407: 4.8",
+               'https://datatracker.ietf.org/doc/html/rfc8407#section-4.8'),
     'submodule': (('contact', 'organization', 'description', 'revision'),
-                  "RFC 8407: 4.8"),
-    'revision':(('reference',), "RFC 8407: 4.8"),
-    'extension':(('description',), "RFC 8407: 4.14"),
-    'feature':(('description',), "RFC 8407: 4.14"),
-    'identity':(('description',), "RFC 8407: 4.14"),
-    'typedef':(('description',), "RFC 8407: 4.13,4.14"),
-    'grouping':(('description',), "RFC 8407: 4.14"),
-    'augment':(('description',), "RFC 8407: 4.14"),
-    'rpc':(('description',), "RFC 8407: 4.14"),
-    'notification':(('description',), "RFC 8407: 4.14,4.16"),
-    'container':(('description',), "RFC 8407: 4.14"),
-    'leaf':(('description',), "RFC 8407: 4.14"),
-    'leaf-list':(('description',), "RFC 8407: 4.14"),
-    'list':(('description',), "RFC 8407: 4.14"),
-    'choice':(('description',), "RFC 8407: 4.14"),
-    'anyxml':(('description',), "RFC 8407: 4.14"),
+                  "RFC 8407: 4.8",
+                  'https://datatracker.ietf.org/doc/html/rfc8407#section-4.8'),
+    'revision':(('reference',),
+                "RFC 8407: 4.8",
+                'https://datatracker.ietf.org/doc/html/rfc8407#section-4.8'),
+    'extension':(('description',),
+                 "RFC 8407: 4.14",
+                 'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
+    'feature':(('description',),
+               "RFC 8407: 4.14",
+               'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
+    'identity':(('description',),
+                "RFC 8407: 4.14",
+                'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
+    'typedef':(('description',),
+               "RFC 8407: 4.13,4.14",
+               'https://datatracker.ietf.org/doc/html/rfc8407#section-4.13'),
+    'grouping':(('description',),
+                "RFC 8407: 4.14",
+                'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
+    'augment':(('description',),
+               "RFC 8407: 4.14",
+               'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
+    'rpc':(('description',),
+           "RFC 8407: 4.14",
+           'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
+    'notification':(('description',),
+                    "RFC 8407: 4.14,4.16",
+                    'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
+    'container':(('description',),
+                 "RFC 8407: 4.14",
+                 'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
+    'leaf':(('description',),
+            "RFC 8407: 4.14",
+            'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
+    'leaf-list':(('description',),
+                 "RFC 8407: 4.14",
+                 'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
+    'list':(('description',),
+            "RFC 8407: 4.14",
+            'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
+    'choice':(('description',),
+              "RFC 8407: 4.14",
+              'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
+    'anyxml':(('description',),
+              "RFC 8407: 4.14",
+              'https://datatracker.ietf.org/doc/html/rfc8407#section-4.14'),
     }
 
 _recommended_substatements = {
-    'enum':(('description',), "RFC 8407: 4.11.3,4.14"),
-    'bit':(('description',), "RFC 8407: 4.11.3,4.14"),
+    'enum':(('description',),
+            "RFC 8407: 4.11.3,4.14",
+            'https://datatracker.ietf.org/doc/html/rfc8407#section-4.11.3'),
+    'bit':(('description',),
+           "RFC 8407: 4.11.3,4.14",
+           'https://datatracker.ietf.org/doc/html/rfc8407#section-4.11.3'),
     }
 
 def v_chk_default(ctx, stmt):
@@ -223,7 +266,7 @@ def v_chk_default(ctx, stmt):
 
 def v_chk_required_substmt(ctx, stmt):
     if stmt.keyword in _required_substatements:
-        (required, s) = _required_substatements[stmt.keyword]
+        (required, s, _) = _required_substatements[stmt.keyword]
         for r in required:
             if stmt.search_one(r) is None:
                 err_add(ctx.errors, stmt.pos,
@@ -232,7 +275,7 @@ def v_chk_required_substmt(ctx, stmt):
 
 def v_chk_recommended_substmt(ctx, stmt):
     if stmt.keyword in _recommended_substatements:
-        (recommended, s) = _recommended_substatements[stmt.keyword]
+        (recommended, s, _uri) = _recommended_substatements[stmt.keyword]
         for r in recommended:
             if stmt.search_one(r) is None:
                 err_add(ctx.errors, stmt.pos,
@@ -293,7 +336,7 @@ def v_chk_mandatory_top_level(ctx, stmt):
 
 def v_chk_hyphenated_names(ctx, stmt):
     if stmt.keyword in grammar.stmt_map:
-        arg_type, subspec = grammar.stmt_map[stmt.keyword]
+        arg_type, _subspec = grammar.stmt_map[stmt.keyword]
         if arg_type in ('identifier', 'enum-arg') and not_hyphenated(stmt.arg):
             error.err_add(ctx.errors, stmt.pos, 'LINT_NOT_HYPHENATED', stmt.arg)
 

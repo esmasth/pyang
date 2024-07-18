@@ -8,10 +8,10 @@ def _match_part_position(pos: lsp.Position, sline, schar, eline, echar):
     if sline <= pos.line <= eline:
         if sline != eline:
             if (pos.line == sline and schar > pos.character) or \
-                (pos.line == eline and echar <= pos.character):
-                    return False
+                    (pos.line == eline and echar <= pos.character):
+                return False
             return True
-        elif schar < pos.character < echar:
+        if schar < pos.character < echar:
             return True
     return False
 
@@ -35,11 +35,21 @@ def stmt_from_lsp_position(
             line_stmt = stmt_from_lsp_position(s, position)
             if line_stmt:
                 return line_stmt
-    if hasattr(stmt, 'i_children'):
-        for s in stmt.i_children:
-            line_stmt = stmt_from_lsp_position(s, position)
-            if line_stmt:
-                return line_stmt
+    if hasattr(stmt_pos, 'sub_sline') and \
+            hasattr(stmt_pos, 'sub_eline') and \
+            hasattr(stmt_pos, 'sub_schar') and \
+            hasattr(stmt_pos, 'sub_echar'):
+        match = _match_part_position(position,
+                                     stmt_pos.sub_sline, stmt_pos.sub_schar,
+                                     stmt_pos.sub_eline, stmt_pos.sub_echar)
+        if match:
+            return (stmt, 'sub')
+    match = _match_part_position(position,
+                                 stmt_pos.stmt_sline, stmt_pos.stmt_schar,
+                                 stmt_pos.stmt_eline, stmt_pos.stmt_echar)
+    if match:
+        return (stmt, 'stmt')
+    return None
 
 def stmt_lsp_range(epos: error.Position) -> lsp.Range:
     return lsp.Range(

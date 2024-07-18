@@ -735,6 +735,9 @@ def v_type_typedef(ctx, stmt):
     if isinstance(type_spec, types.PathTypeSpec):
         stmt.i_leafref = type_spec
 
+    if type_.i_typedef and type_ not in type_.i_typedef.i_referencing_nodes:
+        type_.i_typedef.i_referencing_nodes.append(type_)
+
     def check_circular_typedef(ctx, type_):
         # ensure the type is validated
         v_type_type(ctx, type_)
@@ -1392,6 +1395,10 @@ def v_type_base(ctx, stmt, no_error_report=False):
             pass
         else:
             stmt.i_identity = i
+            # TODO: Check why this is missing in some cases
+            if hasattr(i, 'i_referencing_nodes'):
+                if stmt not in i.i_referencing_nodes:
+                    i.i_referencing_nodes.append(stmt)
             v_type_identity(ctx, stmt.i_identity)
     if stmt.i_identity is None and no_error_report is False:
         err_add(ctx.errors, stmt.pos,
@@ -1544,6 +1551,8 @@ def v_expand_1_uses(ctx, stmt):
                 err_add(ctx.errors, refinement.pos, 'BAD_NODE_IN_REFINE',
                         (module.i_modulename, identifier))
                 return None
+        node.i_referencing_nodes.append(refinement)
+        refinement.i_target_node = node
         return node
 
     def replace_from_refinement(target, refinement, keyword, valid_keywords,
@@ -1553,6 +1562,7 @@ def v_expand_1_uses(ctx, stmt):
         if new is not None and target.keyword in valid_keywords:
             old = target.search_one(keyword)
             if old is not None:
+                target.i_refined[old.keyword] = old.arg
                 target.substmts.remove(old)
             if v_fun is not None:
                 v_fun(ctx, target, new)
@@ -1671,6 +1681,7 @@ def v_expand_1_uses(ctx, stmt):
             if util.is_prefixed(s.keyword):
                 old = target.search_one(s.keyword)
                 if old is not None:
+                    target.i_refined[s.keyword] = old.arg
                     target.substmts.remove(old)
                 s.parent = target
                 target.substmts.append(s)
@@ -1761,6 +1772,9 @@ def v_expand_2_augment(ctx, stmt):
         # already expanded
         return
     stmt.i_target_node = find_target_node(ctx, stmt, is_augment=True)
+    if stmt.i_target_node:
+        if stmt not in stmt.i_target_node.i_referencing_nodes:
+            stmt.i_target_node.i_referencing_nodes.append(stmt)
 
     if stmt.i_target_node is None:
         return
@@ -1894,6 +1908,9 @@ def v_expand_3_augment(ctx, stmt):
     this is that stmt.i_target_node may point to a __tmp_augment__ node.
     """
     stmt.i_target_node = find_target_node(ctx, stmt, is_augment=True)
+    if stmt.i_target_node:
+        if stmt not in stmt.i_target_node.i_referencing_nodes:
+            stmt.i_target_node.i_referencing_nodes.append(stmt)
 
 def create_new_case(ctx, choice, child, expand=True):
     new_case = new_statement(child.top, choice, child.pos, 'case', child.arg)
@@ -2067,6 +2084,9 @@ def v_reference_list(ctx, stmt):
 
                 stmt.i_key.append(ptr)
                 ptr.i_is_key = True
+                # Malformed xpaths may not have valid key
+                if hasattr(ptr, 'i_referencing_nodes'):
+                    ptr.i_referencing_nodes.append(key)
                 found.append(x)
 
     def v_unique():
@@ -2189,6 +2209,8 @@ def v_reference_leaf_leafref(ctx, stmt):
             return
         ptr, expanded_path, path_list = x
         path_type_spec.i_target_node = ptr
+        if path_type_spec.path_ not in ptr.i_referencing_nodes:
+            ptr.i_referencing_nodes.append(path_type_spec.path_)
         path_type_spec.i_expanded_path = expanded_path
         path_type_spec.i_path_list = path_list
         stmt.i_leafref_expanded = True
@@ -2222,6 +2244,8 @@ def v_xpath(ctx, stmt):
 
 def v_reference_deviation(ctx, stmt):
     stmt.i_target_node = find_target_node(ctx, stmt)
+    if stmt.i_target_node:
+        stmt.i_target_node.i_referencing_nodes.append(stmt)
 
 def v_reference_deviate(ctx, stmt):
     def search_children_config_true(node, target):
@@ -2845,6 +2869,8 @@ def validate_leafref_path(ctx, stmt, path_spec, path,
                         err_add(ctx.errors, pathpos, 'LEAFREF_NO_KEY',
                                 (pmodule.arg, pname, stmt.arg, stmt.pos))
                         raise NotFound
+                    elif path not in pleaf.i_referencing_nodes:
+                        pleaf.i_referencing_nodes.append(path)
                     # make sure it's not already referenced
                     if keyleaf in keys:
                         err_add(ctx.errors, pathpos, 'LEAFREF_MULTIPLE_KEYS',
@@ -2885,6 +2911,8 @@ def validate_leafref_path(ctx, stmt, path_spec, path,
                          util.keyword_to_str(ptr.keyword)))
                 raise NotFound
             path_list.append(('dn', ptr))
+            if path not in ptr.i_referencing_nodes:
+                ptr.i_referencing_nodes.append(path)
             i = i + 1
         return (key_list, keys, ptr, path_list)
 
@@ -2993,6 +3021,8 @@ class Statement(object):
         'i_not_implemented', # if set (True) this statement is not implemented,
                              # either a false if-feature or status
                              # deprecated/obsolete
+        'i_referencing_nodes',
+        'i_refined',
 
         # see v_init_has_children()
         'i_children',
@@ -3049,6 +3079,12 @@ class Statement(object):
 
         self.substmts = []
         """the statement's substatements; a list of Statements"""
+
+        self.i_referencing_nodes = []
+        """the statement's referencing statements; a list of Statements"""
+
+        self.i_refined = {}
+        """the statement's refined statements; a dict[keyword, original arg]"""
 
     def __str__(self):
         return '%s %s' % (self.keyword, self.arg)

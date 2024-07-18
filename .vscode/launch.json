@@ -24,8 +24,8 @@
 				"--verbose",
 				// "--path=${workspaceFolder}/modules",
 				// "--path=/home/esmasth/code/test-sdk/yang",
-				"--plugindir=/home/esmasth/code/pyanglint/src/pyangeydr",
 				"--ericsson",
+				"--ericsson-omp",
 			]
 		},
 		{

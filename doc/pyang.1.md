@@ -1163,7 +1163,7 @@ directory **\$YANG_INSTALL**/yang/modules.
 
 **pyang** searches for plugins in the colon (:) separated path
 defined by the environment variable
-**\$PYANG_PLUGINDIR**.
+**\$PYANG_PLUGINPATH**.
 
 # BUGS
 

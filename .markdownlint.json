@@ -8,6 +8,7 @@
       "json",
       "lisp",
       "ini",
+      "mermaid",
       "text"
     ],
     "language_only": true

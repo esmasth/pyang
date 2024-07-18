@@ -374,10 +374,14 @@ class YangParser(object):
         tok = self.tokenizer.peek()
         if tok == '{':
             self.tokenizer.skip_tok() # skip the '{'
+            stmt.pos.sub_sline = self.tokenizer.pos.line - 1
+            stmt.pos.sub_schar = self.tokenizer.offset
             self.last_line = self.pos.line
             while self.tokenizer.peek() != '}':
                 substmt = self._parse_statement(stmt)
                 stmt.substmts.append(substmt)
+            stmt.pos.sub_eline = self.tokenizer.pos.line - 1
+            stmt.pos.sub_echar = self.tokenizer.offset
             self.tokenizer.skip_tok() # skip the '}'
         elif tok == ';':
             self.tokenizer.skip_tok() # skip the ';'
