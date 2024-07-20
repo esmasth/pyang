@@ -135,13 +135,13 @@
 
 #### Code Lens
 
-- [ ] [codeLensProvider][textDocument_codeLens]
+- [x] [codeLensProvider][textDocument_codeLens]
   - [ ] [resolveProvider][codeLensOptions]
   - [ ] [workspace.codeLens][codeLens_refresh] <-- *Config Change Use Case*
 
 #### Folding Range
 
-- [ ] [foldingRangeProvider][textDocument_foldingRange]
+- [x] [foldingRangeProvider][textDocument_foldingRange]
 
 #### Selection Range
 

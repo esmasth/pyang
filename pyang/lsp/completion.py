@@ -1,22 +1,36 @@
-from typing import List, Tuple
+"""LSP Completion Proposals Provider
+
+* `textDocument/completion`
+  https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion
+
+TODO:
+* `completionItem/resolve`
+  https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve
+"""
+
+from typing import List, Tuple, Union
 
 from lsprotocol import types as lsp
+from pygls.server import LanguageServer
 
 from pyang import grammar, types
 from pyang.context import Context
-from pyang.lsp import glue, helper, maps, rfcref
 from pyang.plugins import lint
-from pyang.statements import Statement, ImportStatement, ModSubmodStatement
+from pyang.statements import (
+    ImportStatement,
+    ModSubmodStatement,
+    Statement,
+)
 from pyang.translators import yang
+
+from . import common, glue, kinds, rfc
 
 INDENT_STEP = 2
 
-trigger_characters = ['/']
-
 keyword_arg_detail = {
-    'description' : 'description',
-    'reference'   : 'reference',
-    'presence'    : 'implication',
+    'description' : 'description-text',
+    'reference'   : 'reference-text',
+    'presence'    : 'implication-text',
     'grouping'    : 'name',
     'container'   : 'name',
     'list'        : 'name',
@@ -93,9 +107,9 @@ def mandatory_substmt_keywords(
 def get_base_type(ctx: Context, stmt: Statement):
     stmt_type = stmt.search_one('type')
     if stmt_type:
-        if stmt_type.arg in maps.type_lsp_kind:
+        if stmt_type.arg in kinds.type_map:
             return stmt_type.arg
-        typedef = helper.referenced_stmt_from_stmt_arg(ctx, stmt_type)
+        typedef = common.referenced_stmt_from_stmt_arg(ctx, stmt_type)
         if typedef:
             return get_base_type(ctx, typedef)
     return None
@@ -266,8 +280,8 @@ def create_keyword_item(
 ) -> lsp.CompletionItem:
     try:
         kind = lsp.CompletionItemKind.Snippet
-        label_detail = rfcref.rfcref_stmt_map[keyword]['title']
-        label_description = rfcref.rfcref_stmt_map[keyword]['uri']
+        label_detail = rfc.stmt_map[keyword]['title']
+        label_description = rfc.stmt_map[keyword]['uri']
     except KeyError:
         kind = lsp.CompletionItemKind.Keyword
         label_detail = keyword + ' label detail TBD'
@@ -299,11 +313,16 @@ implicit_props = [
 ]
 """Implicit node properties wherever applicable"""
 
-def build_list(
-    ctx: Context,
-    module: ModSubmodStatement,
-    position: lsp.Position,
-) -> List[lsp.CompletionItem] | None:
+def text_document_completion(
+    ls: LanguageServer,
+    params: lsp.CompletionParams,
+) -> Union[List[lsp.CompletionItem], lsp.CompletionList, None]:
+    """Handles LSP `textDocument/completion` request."""
+    module = ls.modules[params.text_document.uri] # type: ignore
+    if not module:
+        return None
+    ctx = ls.ctx # type: ignore
+    position = params.position
     comp_items = []
     stmt_match = glue.stmt_from_lsp_position(module, position)
     if not stmt_match:
@@ -369,7 +388,7 @@ def build_list(
                                     edit_range=lsp.Range(start=position, end=position),
                                     edit_new_text='deviate not-supported;',
                                     text_format=lsp.InsertTextFormat.PlainText,
-                                    kind=maps.keyword_lsp_kind[stmt.keyword]['completion']
+                                    kind=kinds.keyword_map[stmt.keyword]['completion']
                                 )
                             )
                             continue
@@ -484,7 +503,7 @@ def build_list(
                                 edit_range=edit_range,
                                 edit_new_text=type_spec,
                                 sort_idx=sort_idx,
-                                kind=maps.type_lsp_kind[type_spec]['completion'],
+                                kind=kinds.type_map[type_spec]['completion'],
                                 text_format=lsp.InsertTextFormat.PlainText,
                             )
                         )
@@ -507,3 +526,11 @@ def build_list(
         case _:
             return None
     return comp_items
+
+def register_callbacks(ls: LanguageServer):
+    ls.feature(
+        lsp.TEXT_DOCUMENT_COMPLETION,
+        lsp.CompletionOptions(
+            trigger_characters=['/', '(', ':'],
+        ),
+    )(text_document_completion)

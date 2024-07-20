@@ -1,6 +1,6 @@
 """YANG RFC References"""
 
-rfcref_stmt_map = {
+stmt_map = {
     'module': {
         'title': 'The `module` Statement',
         'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.1',
@@ -315,7 +315,7 @@ rfcref_stmt_map = {
     },
 }
 
-rfcref_type_map = {
+type_map = {
     'int8': {
         'title': 'The Integer Built-In Types',
         'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-9.2',

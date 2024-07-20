@@ -356,7 +356,7 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
     if o.lsp:
         try:
             pyangls.try_import_deps()
-            pyangls.start_server(o, ctx, fmts)
+            pyangls.start_server(o, ctx)
             sys.exit(0)
         except ModuleNotFoundError as e:
             print("LSP feature required external dependencies are missing")

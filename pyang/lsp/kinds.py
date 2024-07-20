@@ -1,6 +1,8 @@
+"""YANG Definitions to LSP Kind Maps"""
+
 from lsprotocol import types as lsp
 
-type_lsp_kind = {
+type_map = {
     'uint8': {
         'symbol'    : lsp.SymbolKind.Number,
         'completion': lsp.CompletionItemKind.TypeParameter,
@@ -85,7 +87,7 @@ Following property keys are present
 * `completion`: LSP `CompletionItemKind`
 """
 
-keyword_lsp_kind = {
+keyword_map = {
     'module': {
         'symbol'    : lsp.SymbolKind.Module,
         'completion': lsp.CompletionItemKind.Module,
@@ -283,4 +285,9 @@ keyword_lsp_kind = {
         'completion': lsp.CompletionItemKind.Reference,
     },
 }
-"""YANG `keyword` mapping to LSP"""
+"""YANG `keyword` mapping to LSP
+
+Following property keys are present
+* `symbol`: LSP `SymbolKind`
+* `completion`: LSP `CompletionItemKind`
+"""

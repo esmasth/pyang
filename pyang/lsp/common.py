@@ -1,9 +1,26 @@
-"""Helper functions to traverse pyang structures"""
+"""Common functions to traverse pyang structures"""
 
 from typing import List
-from pyang import error, util
+
+from pyang import error, util, yang_parser
 from pyang.context import Context
-from pyang.statements import AugmentStatement, DeviationStatement, GroupingStatement, ImportStatement, ModSubmodStatement, Statement, TypeStatement, UsesStatement
+from pyang.statements import (
+    AugmentStatement,
+    DeviationStatement,
+    GroupingStatement,
+    ImportStatement,
+    ModSubmodStatement,
+    Statement,
+    TypeStatement,
+    UsesStatement,
+)
+
+
+def have_parser_errors(ctx: Context) -> bool:
+    for _, etag, _ in ctx.errors:
+        if etag in yang_parser.errors:
+            return True
+    return False
 
 def is_top_level_stmt(stmt: Statement) -> bool:
     return stmt.parent == stmt.top
@@ -217,7 +234,7 @@ def find_feature_deps(
     return deps
 
 
-def _get_ctx_modules(ctx: Context):
+def get_ctx_modules(ctx: Context):
     modules = []
     for k in ctx.modules:
         m = ctx.modules[k]
@@ -231,7 +248,7 @@ def find_stmt_references(
     stmt: Statement
 ) -> List[Statement]:
     stmt_refs: List[Statement] = []
-    for module in _get_ctx_modules(ctx):
+    for module in get_ctx_modules(ctx):
         match stmt.keyword:
             case 'grouping':
                 stmt_refs.extend(find_grouping_uses(stmt, module))  # type: ignore
