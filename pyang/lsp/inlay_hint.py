@@ -86,7 +86,30 @@ def stmt_hints(
             )
         )
 
+    mandatory_stmt = stmt.search_one('mandatory')
+    if not mandatory_stmt and stmt.keyword in ['anydata', 'anyxml', 'leaf', 'choice']:
+        hints.append(
+            create_item(
+                line=line,
+                character=character,
+                label_value='mandatory false;',
+                label_tooltip_value='implicit `mandatory` property',
+                tooltip_value='implicit `mandatory` property',
+            )
+        )
+
     match stmt.keyword:
+        case 'module':
+            if not stmt.search_one('yang-version'):
+                hints.append(
+                    create_item(
+                        line=line,
+                        character=character,
+                        label_value='yang-version 1;',
+                        label_tooltip_value='implicit `yang-version` property',
+                        tooltip_value='implicit `yang-version` property',
+                    )
+                )
         case 'list':
             if not stmt.search_one('min-elements'):
                 min_elements = 0

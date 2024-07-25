@@ -6,6 +6,7 @@ import os
 from types import ModuleType
 from typing import Any, List
 import importlib
+import logging
 
 from lsprotocol import types as lsp
 from pygls.server import LanguageServer
@@ -22,11 +23,13 @@ from . import (
     cross_reference,
     diagnostics,
     document_highlight,
+    document_link,
     folding_range,
     formatting,
     hover,
     inlay_hint,
     inline_value,
+    semantic_tokens,
     symbols,
 )
 
@@ -65,6 +68,8 @@ class PyangLanguageServer(LanguageServer):
             text_document_sync_kind=lsp.TextDocumentSyncKind.Full
         )
 
+logging.basicConfig(filename='pyang-ls.log', filemode='w', level=logging.DEBUG)
+
 pyangls = PyangLanguageServer()
 
 code_lens.register_callbacks(pyangls)
@@ -72,12 +77,14 @@ completion.register_callbacks(pyangls)
 cross_reference.register_callbacks(pyangls)
 diagnostics.register_callbacks(pyangls)
 document_highlight.register_callbacks(pyangls)
+document_link.register_callbacks(pyangls)
 folding_range.register_callbacks(pyangls)
 formatting.register_callbacks(pyangls)
 hover.register_callbacks(pyangls)
 inlay_hint.register_callbacks(pyangls)
 inline_value.register_callbacks(pyangls)
 symbols.register_callbacks(pyangls)
+semantic_tokens.register_callbacks(pyangls)
 
 def add_opts(optparser: optparse.OptionParser):
     optlist = [
@@ -113,7 +120,6 @@ def add_opts(optparser: optparse.OptionParser):
 def gen_config_schema():
     return
 
-
 def start_server(optargs, ctx: context.Context):
     pyangls.ctx = ctx
     if optargs.pyangls_mode == SERVER_MODE_TCP:
@@ -122,7 +128,6 @@ def start_server(optargs, ctx: context.Context):
         pyangls.start_ws(optargs.pyangls_host, optargs.pyangls_port)
     else:
         pyangls.start_io()
-
 
 def _delete_from_ctx(text_doc: TextDocument):
     if not pyangls.modules:
@@ -133,7 +138,6 @@ def _delete_from_ctx(text_doc: TextDocument):
         return
     pyangls.ctx.del_module(module)
     del pyangls.modules[text_doc.uri]
-
 
 def _add_to_ctx(text_doc: TextDocument):
     assert text_doc.filename
@@ -152,20 +156,17 @@ def _add_to_ctx(text_doc: TextDocument):
         pyangls.modules[text_doc.uri] = module
     return module
 
-
 def _update_ctx_modules():
     for text_doc in pyangls.workspace.documents.values():
         _delete_from_ctx(text_doc)
     for text_doc in pyangls.workspace.documents.values():
         _add_to_ctx(text_doc)
 
-
 def _clear_stmt_validation(stmt: Statement):
     stmt.i_is_validated = False
     substmt : Statement
     for substmt in stmt.substmts:
         _clear_stmt_validation(substmt)
-
 
 def _clear_ctx_validation():
     pyangls.doc_symbols = {}
@@ -176,7 +177,6 @@ def _clear_ctx_validation():
     for module in pyangls.ctx.modules.values():
         module.internal_reset()
         # _clear_stmt_validation(module)
-
 
 def _validate_ctx_modules():
     # ls.show_message_log("Validating YANG...")
@@ -195,7 +195,6 @@ def _validate_ctx_modules():
     for p in plugin.plugins:
         p.post_validate_ctx(pyangls.ctx, modules)
 
-
 def _get_folder_yang_uris(folder_uri) -> List[str]:
     """Recursively find all .yang files in the given folder."""
     folder = to_fs_path(folder_uri)
@@ -207,7 +206,6 @@ def _get_folder_yang_uris(folder_uri) -> List[str]:
             if file.endswith(".yang") and not file.startswith('.#'):
                 yang_files.append(from_fs_path(os.path.join(root, file)))
     return yang_files
-
 
 def _process_workspace_configuration(_scope: str | None, _config: List[Any]):
     pass
@@ -227,12 +225,9 @@ def initialized(
 ):
     """Handles LSP `initialized` notification."""
 
-    _clear_ctx_validation()
-
-    if ls.workspace.folders:
-        # TODO: Handle more than one workspace folder
-        folder = next(iter(ls.workspace.folders.values()))
-        yang_uris = _get_folder_yang_uris(folder.uri)
+    def add_workspace_folder(uri: str):
+        _clear_ctx_validation()
+        yang_uris = _get_folder_yang_uris(uri)
         for yang_uri in yang_uris:
             if not yang_uri in ls.workspace.text_documents.keys():
                 yang_file = to_fs_path(yang_uri)
@@ -248,10 +243,22 @@ def initialized(
                         text=yang_source,
                     )
                 )
+        _update_ctx_modules()
+        _validate_ctx_modules()
+        diagnostics.publish_workspace_diagnostics(ls)
 
-    _update_ctx_modules()
-    _validate_ctx_modules()
-    diagnostics.publish_workspace_diagnostics(ls)
+    if ls.workspace.folders:
+        # TODO: Handle more than one workspace folder
+        folder = next(iter(ls.workspace.folders.values()))
+        add_workspace_folder(folder.uri)
+    # fallback to pre 3.6.0
+    elif ls.workspace.root_uri:
+        add_workspace_folder(ls.workspace.root_uri)
+    # fallback to pre 3.0
+    elif ls.workspace.root_path:
+        uri = from_fs_path(ls.workspace.root_path)
+        if uri:
+            add_workspace_folder(uri)
 
 
 ################################################################################

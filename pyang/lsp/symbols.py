@@ -23,7 +23,7 @@ from pygls.server import LanguageServer
 
 from pyang import error, grammar
 from pyang.context import Context
-from pyang.lsp import common, kinds
+from pyang.lsp import common, types
 from pyang.statements import LeafLeaflistStatement, Statement
 
 from . import glue
@@ -36,20 +36,10 @@ def _stmt_to_lsp_symbol_kind(ctx: Context, stmt: Statement) -> lsp.SymbolKind:
         case str():
             match stmt.keyword:
                 case 'leaf':
-                    def get_base_type(stmt: Statement):
-                        stmt_type = stmt.search_one('type')
-                        if stmt_type:
-                            if stmt_type.arg in kinds.type_map:
-                                return stmt_type.arg
-                            typedef = common.referenced_stmt_from_stmt_arg(ctx, stmt_type)
-                            if typedef:
-                                return get_base_type(typedef)
-                        return None
-
                     def leaf_symbol_kind(
                         leaf: LeafLeaflistStatement
                     ) -> lsp.SymbolKind:
-                        stmt_type = get_base_type(leaf)
+                        stmt_type = common.get_base_type(ctx, leaf)
                         if not stmt_type:
                             return lsp.SymbolKind.Null
                         if stmt_type == 'leafref':
@@ -67,7 +57,7 @@ def _stmt_to_lsp_symbol_kind(ctx: Context, stmt: Statement) -> lsp.SymbolKind:
                                 return lsp.SymbolKind.Null
                             return leaf_symbol_kind(ref_stmt) # type: ignore
                         try:
-                            return kinds.type_map[stmt_type]['symbol']
+                            return types.type_map[stmt_type]['symbol']
                         except KeyError:
                             return lsp.SymbolKind.Field
 
@@ -75,7 +65,7 @@ def _stmt_to_lsp_symbol_kind(ctx: Context, stmt: Statement) -> lsp.SymbolKind:
 
                 case _:
                     try:
-                        return kinds.keyword_map[stmt.keyword]['symbol']
+                        return types.keyword_map[stmt.keyword]['symbol']
                     except KeyError:
                         return lsp.SymbolKind.Null
         case (str(), str()):

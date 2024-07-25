@@ -211,7 +211,7 @@ def publish_workspace_diagnostics(
 #     return lsp.WorkspaceDiagnosticReport(items=items)
 
 
-def register_callbacks(ls: LanguageServer):
+def register_callbacks(_ls: LanguageServer):
     # ls.feature(
     #     lsp.TEXT_DOCUMENT_DIAGNOSTIC,
     #     lsp.DiagnosticOptions(

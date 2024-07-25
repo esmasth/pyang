@@ -68,7 +68,7 @@ def text_document_formatting(
     ls: LanguageServer,
     params: lsp.DocumentFormattingParams,
 ) -> Union[List[lsp.TextEdit], None]:
-    """Handles LSP `textDocument/formatting` notification."""
+    """Handles LSP `textDocument/formatting` request."""
     if not ls.client_capabilities.text_document or \
         not ls.client_capabilities.text_document.formatting:
         return None

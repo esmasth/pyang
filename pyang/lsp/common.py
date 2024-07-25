@@ -2,7 +2,7 @@
 
 from typing import List
 
-from pyang import error, util, yang_parser
+from pyang import error, types, util, yang_parser
 from pyang.context import Context
 from pyang.statements import (
     AugmentStatement,
@@ -264,3 +264,13 @@ def find_stmt_references(
         # stmt_refs.extend(find_deviations(stmt, module))  # type: ignore
     # TODO: Add all references in workspace
     return stmt_refs
+
+def get_base_type(ctx: Context, stmt: Statement):
+    stmt_type = stmt.search_one('type')
+    if stmt_type:
+        if stmt_type.arg in types.yang_type_specs:
+            return stmt_type.arg
+        typedef = referenced_stmt_from_stmt_arg(ctx, stmt_type)
+        if typedef:
+            return get_base_type(ctx, typedef)
+    return None

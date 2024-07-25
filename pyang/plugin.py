@@ -2,6 +2,7 @@
 
 import os
 import sys
+import inspect
 import pkg_resources
 
 plugins = []
@@ -57,6 +58,11 @@ def init(plugindirs=None):
                     modnames.append(modname)
         for modname in modnames:
             pluginmod = __import__(modname)
+            classes = inspect.getmembers(pluginmod, inspect.isclass)
+            plugin_subclasses = [cls_name for cls_name, cls in classes \
+                if issubclass(cls, PyangPlugin)]
+            if len(plugin_subclasses) == 0:
+                continue
             try:
                 pluginmod.pyang_plugin_init()
             except AttributeError as s:

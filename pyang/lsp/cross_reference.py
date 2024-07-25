@@ -59,8 +59,9 @@ def text_document_references(
                 case 'path' | 'augment' | 'deviation':
                     pass
                 case _:
+                    pass
                     # lookup stmt is a reference as well
-                    ref_stmts.append(stmt)
+                    # ref_stmts.append(stmt)
         case _:
             return None
     return _stmts_to_lsp_locations(ref_stmts)
@@ -93,7 +94,7 @@ def text_document_definition(
                 pass
             ref_stmt = common.ext_stmt_from_stmt_kwd(ls.ctx, stmt) # type: ignore
             if not ref_stmt:
-                return
+                return None
             for uri, module in ls.modules.items(): # type: ignore
                 if ref_stmt.top == module:
                     definition_uri = uri
@@ -105,7 +106,7 @@ def text_document_definition(
                     aug: AugmentStatement = stmt # type: ignore
                     ref_stmt = common.get_augmented_stmt(aug)
                     if not ref_stmt:
-                        return
+                        return None
                     for uri, module in ls.modules.items(): # type: ignore
                         if ref_stmt.top == module:
                             definition_uri = uri
@@ -113,7 +114,7 @@ def text_document_definition(
                 case 'refine':
                     ref_stmt = common.get_refined_stmt(stmt)
                     if not ref_stmt:
-                        return
+                        return None
                     for uri, module in ls.modules.items(): # type: ignore
                         if ref_stmt.top == module:
                             definition_uri = uri
@@ -122,7 +123,7 @@ def text_document_definition(
                     dev: DeviationStatement = stmt # type: ignore
                     ref_stmt = common.get_deviated_stmt(dev)
                     if not ref_stmt:
-                        return
+                        return None
                     for uri, module in ls.modules.items(): # type: ignore
                         if ref_stmt.top == module:
                             definition_uri = uri
@@ -130,7 +131,7 @@ def text_document_definition(
                 case 'path':
                     ref_stmt = common.get_leafrefed_stmt(stmt)
                     if not ref_stmt:
-                        return
+                        return None
                     for uri, module in ls.modules.items(): # type: ignore
                         if ref_stmt.top == module:
                             definition_uri = uri

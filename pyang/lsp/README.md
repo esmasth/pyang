@@ -114,17 +114,15 @@
 
 #### Document Link
 
-- [ ] [documentLinkProvider][textDocument_documentLink]
+- [x] [documentLinkProvider][textDocument_documentLink]
 
 #### Hover
 
 - [ ] [hoverProvider][textDocument_hover]
-  - [ ] keywords
+  - [x] keywords
     - [x] YANG RFC
       - [x] RFC URIs
-    - [ ] YANG Extensions
-      - [ ] `argument`
-      - [x] `description`
+    - [x] YANG Extensions
   - [ ] arguments
     - [x] Own
       - [x] `description`
@@ -132,6 +130,7 @@
     - [x] Reference
       - [x] `description`
       - [x] `reference`
+    - [ ] YANG Extensions
 
 #### Code Lens
 
@@ -213,6 +212,9 @@
 #### Rename
 
 - [ ] [renameProvider][textDocument_rename]
+  - [ ] `filename`/`module`/`import`/`belongs-to`
+  - [ ] `filename`/`submodule`/`include`
+  - [ ] `prefix`
 
 #### Linked Editing Range
 

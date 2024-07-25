@@ -16,7 +16,7 @@ def text_document_document_highlight(
     ls: LanguageServer,
     params: lsp.DocumentHighlightParams,
 ) -> Union[List[lsp.DocumentHighlight], None]:
-    """Handles LSP `textDocument/documentHighlight` notification."""
+    """Handles LSP `textDocument/documentHighlight` request."""
     module = ls.modules[params.text_document.uri] # type: ignore
     if not module:
         return None

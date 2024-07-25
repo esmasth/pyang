@@ -40,7 +40,7 @@ def text_document_hover(
         return current
 
     def rfcref_value(rfcref: dict[str, str]) -> str:
-        return rfcref['title'] + ' ' + rfcref['uri']
+        return rfcref['title'] + '\n\n' + rfcref['brief'] + '\n\n' + rfcref['uri']
 
     hover_range = None
     match glue.stmt_from_lsp_position(module, params.position):

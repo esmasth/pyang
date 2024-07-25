@@ -12,6 +12,7 @@ from typing import List, Union
 
 from lsprotocol import types as lsp
 from pygls.server import LanguageServer
+from pygls.uris import from_fs_path
 
 from pyang.context import Context
 from pyang.statements import Statement
@@ -35,7 +36,20 @@ def text_document_code_lens(
         stmt_refs = common.find_stmt_references(ctx, stmt)
         if stmt_refs:
             stmt_ref_count = len(stmt_refs)
-        if stmt_ref_count > 0:
+            stmt_lens_locs = []
+            for stmt_ref in stmt_refs:
+                stmt_ref_uri = from_fs_path(stmt_ref.pos.ref)
+                if not stmt_ref_uri:
+                    continue
+                if stmt.keyword == 'extension':
+                    stmt_ref_range = glue.kwd_lsp_selection_range(stmt_ref.pos)
+                else:
+                    stmt_ref_range = glue.arg_lsp_selection_range(stmt_ref.pos)
+                stmt_lens_loc = lsp.Location(
+                    uri=stmt_ref_uri,
+                    range=stmt_ref_range,
+                )
+                stmt_lens_locs.append(stmt_lens_loc)
             s = ''
             if stmt_ref_count > 1:
                 s = 's'
@@ -44,11 +58,11 @@ def text_document_code_lens(
                 range=stmt_range,
                 command=lsp.Command(
                     title=f'{stmt_ref_count} reference{s}',
-                    command='editor.action.showReferences',
+                    command='pyang.show.references',
                     arguments=[
                         params.text_document.uri,
                         stmt_range.start,
-                        [],
+                        stmt_lens_locs,
                     ]
                 ),
             )

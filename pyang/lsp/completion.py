@@ -23,7 +23,8 @@ from pyang.statements import (
 )
 from pyang.translators import yang
 
-from . import common, glue, kinds, rfc
+from . import glue, rfc
+from . import types as lstypes
 
 INDENT_STEP = 2
 
@@ -103,16 +104,6 @@ def mandatory_substmt_keywords(
     for substmt_prop in substmt_props:
         handle_prop(substmt_prop)
     return mandatory_substmts
-
-def get_base_type(ctx: Context, stmt: Statement):
-    stmt_type = stmt.search_one('type')
-    if stmt_type:
-        if stmt_type.arg in kinds.type_map:
-            return stmt_type.arg
-        typedef = common.referenced_stmt_from_stmt_arg(ctx, stmt_type)
-        if typedef:
-            return get_base_type(ctx, typedef)
-    return None
 
 def stmt_typedefs(
     ctx: Context,
@@ -200,12 +191,12 @@ def generate_stmt_snippet(
             (snippet, idx) = generate_substmt_snippet(idx)
         substmts += substmt_snippet(snippet)
     if keyword in lint._required_substatements:  #pylint: disable=protected-access
-        (req_substmts, _rfc, _uri) = lint._required_substatements[keyword]  #pylint: disable=protected-access
+        req_substmts = lint._required_substatements[keyword][0]  #pylint: disable=protected-access
         for substmt in req_substmts:
             (snippet, idx) = generate_stmt_snippet(ctx, stmt, yangver, substmt, idx, indent + INDENT_STEP)
             substmts += substmt_snippet(snippet)
     elif keyword in lint._recommended_substatements:  #pylint: disable=protected-access
-        (rec_substmts, _rfc, _uri) = lint._recommended_substatements[keyword]  #pylint: disable=protected-access
+        rec_substmts = lint._recommended_substatements[keyword][0]  #pylint: disable=protected-access
         for substmt in rec_substmts:
             (snippet, idx) = generate_stmt_snippet(ctx, stmt, yangver, substmt, idx, indent + INDENT_STEP)
             substmts += substmt_snippet(snippet)
@@ -318,11 +309,14 @@ def text_document_completion(
     params: lsp.CompletionParams,
 ) -> Union[List[lsp.CompletionItem], lsp.CompletionList, None]:
     """Handles LSP `textDocument/completion` request."""
-    module = ls.modules[params.text_document.uri] # type: ignore
+    module: ModSubmodStatement | None = ls.modules[params.text_document.uri] # type: ignore
     if not module:
         return None
     ctx = ls.ctx # type: ignore
     position = params.position
+    if params.context:
+        trigger_kind = params.context.trigger_kind
+        trigger_char = params.context.trigger_character
     comp_items = []
     stmt_match = glue.stmt_from_lsp_position(module, position)
     if not stmt_match:
@@ -388,7 +382,7 @@ def text_document_completion(
                                     edit_range=lsp.Range(start=position, end=position),
                                     edit_new_text='deviate not-supported;',
                                     text_format=lsp.InsertTextFormat.PlainText,
-                                    kind=kinds.keyword_map[stmt.keyword]['completion']
+                                    kind=lstypes.keyword_map[stmt.keyword]['completion']
                                 )
                             )
                             continue
@@ -405,6 +399,48 @@ def text_document_completion(
             else:
                 edit_range = glue.arg_lsp_selection_range(stmt.pos)
             match stmt.keyword:
+                case 'deviation':
+                    # Only handles trigger characters after first completion
+                    match trigger_kind:
+                        case lsp.CompletionTriggerKind.Invoked:
+                            if stmt.arg == '/':
+                                for substmt in module.substmts:
+                                    for data_def_stmt in grammar.data_def_stmts:
+                                        match data_def_stmt:
+                                            case ('$1.1', (keyword, _)):
+                                                pass
+                                            case (keyword, _):
+                                                pass
+                                            case _:
+                                                continue
+                                        if substmt.keyword == keyword:
+                                            kind = lsp.CompletionItemKind.Value
+                                            comp_items.append(
+                                                create_item(
+                                                    label=substmt.arg,
+                                                    label_detail='',
+                                                    label_description='',
+                                                    kind=kind,
+                                                    sort_idx=2,
+                                                    text_format=lsp.InsertTextFormat.PlainText,
+                                                    edit_range=edit_range,
+                                                    edit_new_text=substmt.arg,
+                                                )
+                                            )
+                        case lsp.CompletionTriggerKind.TriggerCharacter:
+                            match trigger_char:
+                                case ':':
+                                    pass
+                                case '/':
+                                    pass
+                                case '(':
+                                    pass
+                                case '[':
+                                    pass
+                        case lsp.CompletionTriggerKind.TriggerForIncompleteCompletions:
+                            pass
+                        case _:
+                            pass
                 case 'yang-version':
                     for version in ['1.1', '1']:
                         comp_items.append(
@@ -503,7 +539,7 @@ def text_document_completion(
                                 edit_range=edit_range,
                                 edit_new_text=type_spec,
                                 sort_idx=sort_idx,
-                                kind=kinds.type_map[type_spec]['completion'],
+                                kind=lstypes.type_map[type_spec]['completion'],
                                 text_format=lsp.InsertTextFormat.PlainText,
                             )
                         )
@@ -531,6 +567,6 @@ def register_callbacks(ls: LanguageServer):
     ls.feature(
         lsp.TEXT_DOCUMENT_COMPLETION,
         lsp.CompletionOptions(
-            trigger_characters=['/', '(', ':'],
+            trigger_characters=['/', '(', '[', ':'],
         ),
     )(text_document_completion)
