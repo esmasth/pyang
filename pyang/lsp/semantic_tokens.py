@@ -96,13 +96,16 @@ def stmt_type_token_idx(ctx: Context, stmt: Statement) -> int:
         return TOKEN_TYPES.index(types.type_map[base_type]['semantic'])
     return TOKEN_TYPES.index(types.SemanticTokenType.Type)
 
-def arg_token_idx(ctx: Context, stmt: Statement) -> int:
+def arg_token_idx(ctx: Context, stmt: Statement) -> int | None:
     match stmt.keyword:
         case 'default':
             return stmt_type_token_idx(ctx, stmt.parent)
         case _:
             if not util.is_prefixed(stmt.keyword):
-                return TOKEN_TYPES.index(types.keyword_map[stmt.keyword]['semantic'])
+                try:
+                    return TOKEN_TYPES.index(types.keyword_map[stmt.keyword]['semantic'])
+                except KeyError:
+                    return None
             # TODO: add a plugin hook to allow specification of extension arg type
             keyword = stmt.keyword[0] + ':' + stmt.keyword[1]
             try:
@@ -208,6 +211,8 @@ def stmt_tokens(
             # FIXME: Set length for first line add more tokens for multiline
             length = 666
         tok_type = arg_token_idx(ctx, stmt)
+        if not tok_type:
+            tok_type = TOKEN_TYPES.index(types.SemanticTokenType.Type)
         tok_mods = arg_tok_mods(stmt)
         tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
         prev_line = sline

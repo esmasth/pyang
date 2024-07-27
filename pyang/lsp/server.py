@@ -57,7 +57,7 @@ default_port = 2087
 class PyangLanguageServer(LanguageServer):
     def __init__(self):
         self.ctx : context.Context
-        self.modules : dict[str, ModSubmodStatement] = {}
+        self.modules : dict[str, ModSubmodStatement | None] = {}
         self.doc_symbols : dict[str, List[lsp.DocumentSymbol] | None] = {}
         self.diagnostics : dict[str, List[lsp.Diagnostic] | None] = {}
         self.handlers: List[ModuleType] = []
@@ -134,6 +134,8 @@ def _delete_from_ctx(text_doc: TextDocument):
         return
     try:
         module = pyangls.modules[text_doc.uri]
+        if not module:
+            return
     except KeyError:
         return
     pyangls.ctx.del_module(module)
@@ -152,8 +154,8 @@ def _add_to_ctx(text_doc: TextDocument):
     else:
         module = pyangls.ctx.add_module(text_doc.path, text_doc.source,
                                         primary_module=True)
-    if module:
-        pyangls.modules[text_doc.uri] = module
+    # if module:
+    pyangls.modules[text_doc.uri] = module
     return module
 
 def _update_ctx_modules():

@@ -303,7 +303,7 @@ class YangParser(object):
             stmt = self._parse_statement(None)
         except error.Abort:
             return None
-        except error.Eof as e:
+        except error.Eof:
             error.err_add(self.ctx.errors, self.pos, 'EOF_ERROR', ())
             return None
         try:
@@ -313,9 +313,9 @@ class YangParser(object):
                 error.err_add(self.ctx.errors, self.pos, 'TRAILING_GARBAGE', ())
         except error.Eof:
             return stmt
-        except:
+        except Exception:
             error.err_add(self.ctx.errors, self.pos, 'TRAILING_GARBAGE', ())
-            pass
+            return stmt
         return None
 
     def _parse_statement(self, parent):

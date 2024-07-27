@@ -341,11 +341,11 @@ async def text_document_document_symbol(
     try:
         module = ls.modules[params.text_document.uri] # type: ignore
         if module is None:
+            if common.have_parser_errors(ls.ctx): # type: ignore
+                ls.show_message_log("Syntactically invalid document is not outlined.",
+                                    msg_type=lsp.MessageType.Debug)
             return None
     except KeyError:
-        if common.have_parser_errors(ls.ctx): # type: ignore
-            ls.show_message_log("Syntactically invalid document is not outlined.",
-                                msg_type=lsp.MessageType.Debug)
         return None
 
     try:

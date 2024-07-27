@@ -22,6 +22,8 @@ def text_document_hover(
 ) -> Union[lsp.Hover, None]:
     """Handles LSP `textDocument/hover` request."""
     module = ls.modules[params.text_document.uri] # type: ignore
+    if not module:
+        return None
 
     hover_value = ''
 
@@ -144,6 +146,8 @@ def text_document_hover(
                         hover_value = append_ref_info(hover_value, stmt)
                 case 'default':
                     type_ = stmt.parent.search_one('type')
+                    if not type_:
+                        return None
                     desc_stmt = None
                     match type_.arg:
                         case 'enumeration':
