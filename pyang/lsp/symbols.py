@@ -124,6 +124,11 @@ def _build_doc_stmt_symbols(
     # TODO: Mark deviated statements
 
     if stmt.arg:
+        if isinstance(stmt.keyword, str):
+            symbol_name = stmt.keyword
+        else:
+            # Likely extension statement
+            return None
         if stmt.parent and stmt.parent.keyword in ['rpc', 'action']:
             symbol_detail = ''
             symbol_name = stmt.keyword
@@ -167,32 +172,14 @@ def _build_doc_stmt_symbols(
                     if deviated:
                         extra_detail += 'Δ'
                     break
-            if isinstance(stmt.keyword, str):
-                symbol_detail = stmt.keyword
-            else:
-                (prefix, keyword) = stmt.keyword
-                if prefix == stmt.top.arg:
-                    symbol_detail = keyword
-                else:
-                    symbol_detail = prefix + ':' + keyword
+            symbol_detail = stmt.keyword
             symbol_detail += extra_detail
             symbol_name = stmt.arg
             if not symbol_select_range:
                 symbol_select_range = glue.arg_lsp_selection_range(stmt.pos)
     else:
-        # Handling extension statements
-        symbol_detail = 'extension'
-        assert stmt.keyword
-        if isinstance(stmt.keyword, str):
-            symbol_name = stmt.keyword
-        else:
-            (prefix, keyword) = stmt.keyword
-            if prefix == stmt.top.arg:
-                symbol_name = keyword
-            else:
-                symbol_name = prefix + ':' + keyword
-        if not symbol_select_range:
-            symbol_select_range = glue.kwd_lsp_selection_range(stmt.pos)
+        # Likely extension statement
+        return None
 
     # Since pyang expansions have already been done, document external groupings
     # need to be resolved to the uses statement symbol and symbol selection.
