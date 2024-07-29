@@ -80,6 +80,10 @@ def text_document_hover(
                                 hover_value = append_hover(hover_value, value)
             hover_range = glue.kwd_lsp_selection_range(stmt.pos)
         case (stmt, 'arg'):
+            stmt_status: Statement | None = stmt.search_one('status')
+            if stmt_status and stmt_status.arg in ['deprecated', 'obsolete']:
+                hover_value = append_hover(hover_value,
+                                           f'This schema node is **{stmt_status.arg}**.')
             desc = statements.get_description(stmt)
             if desc and desc.strip() != '':
                 if stmt.keyword == 'refine':
