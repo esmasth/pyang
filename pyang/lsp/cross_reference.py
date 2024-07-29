@@ -52,6 +52,8 @@ def text_document_references(
 ) -> Union[List[lsp.Location], None]:
     """Handles LSP `textDocument/references` request."""
     module = ls.modules[params.text_document.uri] # type: ignore
+    if not module:
+        return None
     match glue.stmt_from_lsp_position(module, params.position):
         case (stmt, 'arg'):
             ref_stmts = common.find_stmt_references(ls.ctx, stmt) # type: ignore
@@ -73,6 +75,8 @@ def text_document_definition(
 ) -> Union[lsp.Definition, List[lsp.DefinitionLink], None]:
     """Handles LSP `textDocument/definition` request."""
     module = ls.modules[params.text_document.uri] # type: ignore
+    if not module:
+        return None
     definition_uri = None
     origin_select_range = None
     match glue.stmt_from_lsp_position(module, params.position):

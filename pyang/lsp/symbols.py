@@ -362,6 +362,8 @@ def workspace_symbol(
     symbols = []
     for doc_uri in ls.workspace.text_documents:
         module = ls.modules[doc_uri] # type: ignore
+        if not module:
+            continue
         symbols += _build_ws_stmt_symbols(ls.ctx, module, doc_uri, params.query, None) # type: ignore
     return symbols
 
