@@ -8,6 +8,7 @@ TODO:
   https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve
 """
 
+from datetime import datetime
 from typing import List, Tuple, Union
 
 from lsprotocol import types as lsp
@@ -28,21 +29,13 @@ from . import types as lstypes
 
 INDENT_STEP = 2
 
-keyword_arg_detail = {
-    'description' : 'description-text',
-    'reference'   : 'reference-text',
-    'presence'    : 'implication-text',
-    'grouping'    : 'name',
-    'container'   : 'name',
-    'list'        : 'name',
-    'leaf'        : 'name',
-    'leaf-list'   : 'name',
-    'extension'   : 'name',
-    'if-feature'  : 'feature-expr',
-    'choice'      : 'name',
-    'feature'     : 'name',  # FIXME: without detail all if-feature instances referenced the feature in codelens
-    'min-elements': 'count',
-    'max-elements': 'count',
+arg_enum_map = {
+    'boolean': ['true', 'false'],
+    'version': ['1', '1.1'],
+    'status-arg': ['current', 'obsolete', 'deprecated'],
+    'ordered-by-arg': ['user', 'system'],
+    'modifier-arg': ['invert-match'],
+    'deviate-arg': ['add', 'delete', 'replace', 'not-supported'],
 }
 
 keyword_no_substmt_arg = {
@@ -64,9 +57,7 @@ def min_one(cardinality: str) -> bool:
 def max_one(cardinality: str) -> bool:
     return cardinality in ['?', '1']
 
-def maybe_substatements(
-    keyword: str,
-) -> bool:
+def maybe_substatements(keyword: Union[str, Tuple[str, str]]) -> bool:
     match keyword:
         case 'deviate':
             return True
@@ -77,10 +68,10 @@ def maybe_substatements(
 
 def mandatory_substmt_keywords(
     yangver: str,
-    keyword: str,
+    keyword: Union[str, Tuple[str, str]],
 ) -> List[str]:
     mandatory_substmts = []
-    (_, substmt_props) = grammar.stmt_map[keyword]
+    (_, substmt_props) = grammar.stmt_map[keyword] # type: ignore
     def append_mandatory_substmts(substmt_kwd, cardinality):
         if min_one(cardinality):
             mandatory_substmts.append(substmt_kwd)
@@ -105,10 +96,7 @@ def mandatory_substmt_keywords(
         handle_prop(substmt_prop)
     return mandatory_substmts
 
-def stmt_typedefs(
-    ctx: Context,
-    stmt: Statement,
-) -> List[str]:
+def stmt_typedefs(ctx: Context, stmt: Statement) -> List[str]:
     typedefs = []
     if hasattr(stmt, 'i_typedefs'):
         typedefs += stmt.i_typedefs
@@ -132,9 +120,7 @@ def stmt_typedefs(
         typedefs += stmt_typedefs(ctx, stmt.parent)
     return typedefs
 
-def generate_substmt_snippet(
-    idx: int,
-) -> Tuple[str, int]:
+def generate_substmt_snippet(idx: int) -> Tuple[str, int]:
     idx += 1
     snippet = '${%d}' % (idx)
     return (snippet, idx)
@@ -143,41 +129,69 @@ def generate_stmt_snippet(
     ctx: Context,
     stmt: Statement,
     yangver: str,
-    keyword: str,
+    keyword: Union[str, Tuple[str, str]],
     idx: int,
     indent: int,
-
 ) -> Tuple[str, int]:
     idx += 1
 
-    (argtype, _) = grammar.stmt_map[keyword]
-
-    # statement argument placeholder fragment
-    if argtype in yang._non_quote_arg_type:  #pylint: disable=protected-access
-        quote = ''
-    elif argtype in yang._keyword_prefer_single_quote_arg:  #pylint: disable=protected-access
-        quote = "'"
-    else:
-        quote = '"'
-    try:
-        placeholder = ':' + keyword_arg_detail[keyword]
-    except KeyError:
-        match keyword:
-            case 'type':
-                placeholder = '|'
-                for type_spec in types.yang_type_specs:
-                    placeholder += type_spec + ','
-                for typedef in stmt_typedefs(ctx, stmt):
-                    placeholder += typedef + ','
-                placeholder = placeholder.rstrip(',')
-                placeholder += '|'
-            case _:
-                placeholder = ''
+    (argtype, _) = grammar.stmt_map[keyword] # type: ignore
     abs_pre = ''
-    (argtype, _) = grammar.stmt_map[keyword]
-    if argtype == 'absolute-schema-nodeid':
-        abs_pre = '/'
-    argument = '%s%s${%d%s}%s' % (quote, abs_pre, idx, placeholder, quote)
+    if not argtype:
+        argument = ''
+        argsep = ''
+    else:
+        # statement argument placeholder fragment
+        if argtype in yang._non_quote_arg_type:  #pylint: disable=protected-access
+            quote = ''
+        elif argtype in yang._keyword_prefer_single_quote_arg:  #pylint: disable=protected-access
+            quote = "'"
+        else:
+            quote = '"'
+
+        argsep = ' '
+        argument = None
+
+        match argtype:
+            case 'date':
+                match keyword:
+                    case 'revision-date':
+                        # TODO: generate revision-date alternatives
+                        pass
+                    case 'revision':
+                        placeholder = f":{datetime.today().strftime('%Y-%m-%d')}"
+                    case _:
+                        placeholder = ':YYYY-MM-DD'
+            case 'absolute-schema-nodeid':
+                abs_pre = '/'
+                placeholder = ''
+            case _:
+                match keyword:
+                    case 'type':
+                        # FIXME: Resolve candidate
+                        placeholder = '|'
+                        for type_spec in types.yang_type_specs:
+                            placeholder += type_spec + ','
+                        for typedef in stmt_typedefs(ctx, stmt):
+                            placeholder += typedef + ','
+                        placeholder = placeholder.rstrip(',')
+                        placeholder += '|'
+                    case _:
+                        if argtype in arg_enum_map:
+                            placeholder = '|'
+                            for arg_enum in arg_enum_map[argtype]:
+                                placeholder += arg_enum + ','
+                            placeholder = placeholder.rstrip(',')
+                            placeholder += '|'
+                        else:
+                            # TODO: use argument statement argument for extensions
+                            placeholder = f':{argtype}'
+                        # FIXME: without detail all if-feature instances referenced the feature in codelens
+        argument = '%s%s${%d%s}%s' % (quote, abs_pre, idx, placeholder, quote)
+
+        if keyword in yang._force_newline_arg:  #pylint: disable=protected-access
+            argsep = '\n' + (INDENT_STEP * 2) * ' '
+
     substmts = ''
 
     # statement substatements placeholder fragment
@@ -210,11 +224,21 @@ def generate_stmt_snippet(
     else:
         sub = ';'
 
-    argsep = ' '
-    if keyword in yang._force_newline_arg:  #pylint: disable=protected-access
-        argsep = '\n' + (INDENT_STEP * 2) * ' '
+    if isinstance(keyword, str):
+        kwd = keyword
+    else:
+        module: ModSubmodStatement
+        if stmt.top:
+            module = stmt.top
+        else:
+            module = stmt # type: ignore
+        prefix = ''
+        for i_prefix, modname in module.i_prefixes.items():
+            if modname[0] == keyword[0]:
+                prefix = i_prefix
+        kwd = f"{prefix}:{keyword[1]}"
 
-    return (keyword + argsep + argument + sub, idx)
+    return (kwd + argsep + argument + sub, idx)
 
 def create_item(
     label,
@@ -266,23 +290,34 @@ def create_keyword_item(
     stmt: Statement,
     yangver: str,
     position: lsp.Position,
-    keyword: str,
+    keyword: Union[str, Tuple[str, str]],
     indent: int,
 ) -> lsp.CompletionItem:
-    try:
-        kind = lsp.CompletionItemKind.Snippet
-        label_detail = rfc.stmt_map[keyword]['title']
-        label_description = rfc.stmt_map[keyword]['uri']
-    except KeyError:
-        kind = lsp.CompletionItemKind.Keyword
-        label_detail = keyword + ' label detail TBD'
-        label_description = keyword + ' label description TBD'
+    if isinstance(keyword, str):
+        label = keyword
+        try:
+            kind = lsp.CompletionItemKind.Snippet
+            label_detail = rfc.stmt_map[keyword]['title']
+            label_description = rfc.stmt_map[keyword]['uri']
+        except KeyError:
+            kind = lsp.CompletionItemKind.Keyword
+            label_detail = keyword + ' label detail TBD'
+            label_description = keyword + ' label description TBD'
+    else:
+        label = f'{keyword[0]}:{keyword[1]}'
+        try:
+            kind = lsp.CompletionItemKind.Snippet
+            label_detail = grammar.stmt_map[keyword][0] # type: ignore
+            label_description = f'{label} description TBD'
+        except KeyError:
+            kind = lsp.CompletionItemKind.Keyword
+            label_detail = f'{label} detail TBD'
+            label_description = f'{label} description TBD'
     if not maybe_substatements(keyword):
         (snippet, _idx) = generate_stmt_snippet(ctx, stmt, yangver, keyword, 0, indent)
     else:
         (snippet, _idx) = generate_substmt_snippet(0)
     edit_new_text = snippet
-    label = keyword
     edit_range = lsp.Range(
         start=position,
         end=position,
@@ -332,7 +367,7 @@ def text_document_completion(
         case 'sub':
             (_, substmt_props) = grammar.stmt_map[stmt.keyword]
             yangver = module.i_version
-            def append_comp_keyword_item(keyword: str, cardinality: str) -> None:
+            def append_comp_keyword_item(keyword: Union[str, Tuple[str, str]], cardinality: str) -> None:
                 substmts = stmt.search(keyword)
                 if not max_one(cardinality) or not substmts:
                     comp_items.append(
@@ -364,8 +399,10 @@ def text_document_completion(
                             append_comp_keyword_item(keyword, cardinality)
                         continue
                     case ((mod, keyword), cardinality):
-                        if not module.search('import', arg=mod):
+                        if (not module.search('import', arg=mod) and module.arg != mod):
                             continue
+                        append_comp_keyword_item((mod, keyword), cardinality)
+                        continue
                     case ('$1.1', (keyword, cardinality)):
                         if yangver == '1':
                             continue
