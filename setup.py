@@ -12,7 +12,7 @@ modules_iana = glob.glob(os.path.join('modules', 'iana', '*.yang'))
 modules_ietf = glob.glob(os.path.join('modules', 'ietf', '*.yang'))
 xslt = glob.glob(os.path.join('xslt', '*.xsl'))
 schema = glob.glob(os.path.join('schema', '*.rng'))
-schema.extend(glob.glob(os.path.join('schema', 'pyangls.schema.json')))
+schema.extend(glob.glob(os.path.join('schema', 'pyang.schema.json')))
 images = glob.glob(os.path.join('tools', 'images', '*'))
 man1 = glob.glob(os.path.join('man', 'man1', '*.1'))
 
