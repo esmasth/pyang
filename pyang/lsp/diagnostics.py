@@ -28,6 +28,14 @@ def _build_doc_diagnostics(ls: LanguageServer, ref: str) -> List[lsp.Diagnostic]
     for epos, etag, eargs in ls.ctx.errors: # type: ignore
         if epos.ref != ref:
             continue
+        if etag in ls.ctx.opts.ignore_error_tags:
+            continue
+        if ls.ctx.cfg:
+            try:
+                if etag in ls.ctx.cfg['lint']['ignoreErrors']:
+                    continue
+            except KeyError:
+                pass
         msg = error.err_to_str(etag, eargs)
 
         def epos_to_lsp_range(etag: str, epos: error.Position) -> lsp.Range:
@@ -67,14 +75,15 @@ def _build_doc_diagnostics(ls: LanguageServer, ref: str) -> List[lsp.Diagnostic]
             )
 
         def level_to_lsp_severity(level) -> lsp.DiagnosticSeverity:
-            if level == 1 or level == 2:
-                return lsp.DiagnosticSeverity.Error
-            elif level == 3:
-                return lsp.DiagnosticSeverity.Warning
-            elif level == 4:
-                return lsp.DiagnosticSeverity.Information
-            else:
-                return lsp.DiagnosticSeverity.Hint
+            match level:
+                case 1 | 2:
+                    return lsp.DiagnosticSeverity.Error
+                case 3:
+                    return lsp.DiagnosticSeverity.Warning
+                case 4:
+                    return lsp.DiagnosticSeverity.Information
+                case _:
+                    return lsp.DiagnosticSeverity.Hint
 
         diag_tags=[]
         rel_info=[]

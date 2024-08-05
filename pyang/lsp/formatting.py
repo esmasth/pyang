@@ -17,6 +17,7 @@ from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 from pygls.workspace import TextDocument
 
+from pyang.context import Context
 from pyang.lsp import server
 from pyang.translators import yang
 from . import common
@@ -30,9 +31,9 @@ default_remove_unused_imports = False
 default_remove_comments = False
 
 
-def _update_ctx_module(text_doc: TextDocument):
-    server._delete_from_ctx(text_doc)
-    return server._add_to_ctx(text_doc)
+def _update_ctx_module(ctx: Context, text_doc: TextDocument):
+    server._delete_from_ctx(ctx, text_doc)
+    return server._add_to_ctx(ctx, text_doc)
 
 def _format_yang(ls: LanguageServer, source: str, opts, module) -> str:
     if opts.insert_spaces is False:
@@ -73,6 +74,10 @@ def text_document_formatting(
         not ls.client_capabilities.text_document.formatting:
         return None
 
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return None
+
     text_doc = ls.workspace.get_text_document(params.text_document.uri)
     source = text_doc.source
 
@@ -80,14 +85,14 @@ def text_document_formatting(
         ls.show_message("No source found")
         return []
 
-    module = _update_ctx_module(text_doc)
+    module = _update_ctx_module(wfc.ctx, text_doc)
     if module is None:
         if common.have_parser_errors(ls.ctx): # type: ignore
             ls.show_message("Document was syntactically invalid. Did not format.",
                             msg_type=lsp.MessageType.Debug)
         return []
 
-    server._validate_ctx_modules()
+    server._validate_ctx_modules(wfc.ctx)
 
     fmt_text=_format_yang(ls, source, params.options, module)
 

@@ -11,6 +11,7 @@ from pygls.server import LanguageServer
 
 from pyang import grammar
 from pyang.error import Position
+from pyang.lsp import common
 from pyang.statements import ModSubmodStatement, Statement
 
 
@@ -73,6 +74,11 @@ def text_document_folding_range(
     if not ls.client_capabilities.text_document or \
         not ls.client_capabilities.text_document.folding_range:
         return None
+
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return None
+
     module = ls.modules[params.text_document.uri] # type: ignore
     if not module:
         return None

@@ -94,7 +94,7 @@ def add_to_stmts_rules(stmts, rules):
         # both are prefixed, compare modulename
         return rka[0] < rkb[0]
     for s in stmts:
-        (arg, rules0) = stmt_map[s]
+        (_arg, rules0) = stmt_map[s]
         for r in rules:
             i = 0
             while i < len(rules0):
@@ -783,7 +783,7 @@ def _match_stmt(ctx, stmt, specs, canonical):
 
 def spec_del_kwd(keywd, spec):
     i = 0
-    for kw, s in spec:
+    for kw, _s in spec:
         if kw == keywd:
             return spec[:i] + spec[i+1:]
         i = i + 1

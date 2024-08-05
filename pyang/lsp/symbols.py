@@ -325,6 +325,10 @@ async def text_document_document_symbol(
             not ls.client_capabilities.text_document.document_symbol:
         return None
 
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return None
+
     try:
         module = ls.modules[params.text_document.uri] # type: ignore
         if module is None:

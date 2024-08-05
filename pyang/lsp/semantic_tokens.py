@@ -14,7 +14,7 @@ from typing import List, Tuple, Union
 from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
-from pyang import util
+from pyang import grammar, util
 from pyang.context import Context
 from pyang.lsp import common
 from pyang.statements import ModSubmodStatement, Statement
@@ -101,17 +101,19 @@ def arg_token_idx(ctx: Context, stmt: Statement) -> int | None:
         case 'default':
             return stmt_type_token_idx(ctx, stmt.parent)
         case _:
-            if not util.is_prefixed(stmt.keyword):
-                try:
-                    return TOKEN_TYPES.index(types.keyword_map[stmt.keyword]['semantic'])
-                except KeyError:
-                    return None
-            # TODO: add a plugin hook to allow specification of extension arg type
-            keyword = stmt.keyword[0] + ':' + stmt.keyword[1]
             try:
-                return TOKEN_TYPES.index(types.keyword_map[keyword]['semantic'])
+                token_type = types.keyword_map[stmt.keyword]['semantic']
             except KeyError:
-                return TOKEN_TYPES.index(types.SemanticTokenType.Type)
+                match grammar.stmt_map[stmt.keyword][0]:
+                    case 'identifier':
+                        token_type = types.SemanticTokenType.Type
+                    case 'string':
+                        token_type = types.SemanticTokenType.String
+                    case 'non-negative-integer':
+                        token_type = types.SemanticTokenType.Number
+                    case _:
+                        token_type = types.SemanticTokenType.Type
+            return TOKEN_TYPES.index(token_type)
 
 def arg_tok_mods(stmt: Statement) -> int:
     tok_mods = 0
@@ -178,21 +180,20 @@ def stmt_tokens(
             length = len(prefix)
             tok_type = TOKEN_TYPES.index(types.SemanticTokenType.Namespace)
             tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
-            schar += delta_char
             # :
             delta_line = 0
             delta_char = length
+            schar += length
             length = 1
             tok_type = TOKEN_TYPES.index(types.SemanticTokenType.Operator)
             tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
-            schar += delta_char
             # keyword
             delta_line = 0
             delta_char = length
+            schar += length
             length = len(keyword)
             tok_type = TOKEN_TYPES.index(types.SemanticTokenType.Keyword)
             tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
-            schar -= 1 # FIXME: bandaid to fix arg token delta
     prev_line = sline
     prev_char = schar
 
@@ -232,6 +233,10 @@ def text_document_semantic_tokens_full(
     """Handles LSP `textDocument/semanticTokens/full` request."""
     if not ls.client_capabilities.text_document or \
             not ls.client_capabilities.text_document.semantic_tokens:
+        return None
+
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
         return None
 
     module: ModSubmodStatement = ls.modules[params.text_document.uri] # type: ignore

@@ -2245,7 +2245,8 @@ def v_xpath(ctx, stmt):
 def v_reference_deviation(ctx, stmt):
     stmt.i_target_node = find_target_node(ctx, stmt)
     if stmt.i_target_node:
-        stmt.i_target_node.i_referencing_nodes.append(stmt)
+        if hasattr(stmt.i_target_node, 'i_referencing_nodes'):
+            stmt.i_target_node.i_referencing_nodes.append(stmt)
 
 def v_reference_deviate(ctx, stmt):
     def search_children_config_true(node, target):

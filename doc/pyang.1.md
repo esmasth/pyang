@@ -61,6 +61,20 @@ program exits with exit code 0 if all modules are valid.
 **-v**, **-\-version**
 :   Print the version number and exit.
 
+**-c**, **-\-config** _config_
+:   Use configuration file at path specified by _config_.
+    Default configuration file is named *.pyang.json* and the search
+    locations are as listed below, with corresponding precedence for
+    overrides:
+
+    1.  **.pyang.json** in project directory (as specified by _projdir_)
+    2.  **.pyang.json** current directory
+
+**-\-project-dir** _projdir_
+:   Project directory that is searched for configuration file and used
+    as a recursive module search path. Default is the directory in which
+    **pyang** is being run.
+
 **-e**, **-\-list-errors**
 :   Print a listing of all error codes and messages pyang might
     generate, and then exit.
@@ -262,7 +276,7 @@ program exits with exit code 0 if all modules are valid.
         $ pyang -f tree --exclude-features mymod:myfeat mymod.yang
 
 **-\-max-status** _maxstatus_
-:   _maxstatus_ is one of:_current_,_deprecated_, or _obsolete_.
+:   _maxstatus_ is one of: _current_, _deprecated_, or _obsolete_.
 
     This option is used to prune the data model by removing all nodes
     that are defined with a \"status\" that is less than the given
@@ -290,9 +304,10 @@ program exits with exit code 0 if all modules are valid.
     The following directories are always added to the search path:
 
     1.  current directory
-    2.  **$YANG\_MODPATH**
-    3.  **$HOME**/yang/modules
-    4.  **$YANG\_INSTALL**/yang/modules OR if **$YANG\_INSTALL** is unset
+    2.  project directory, as specified by _projdir_
+    3.  **$YANG\_MODPATH**
+    4.  **$HOME**/yang/modules
+    5.  **$YANG\_INSTALL**/yang/modules OR if **$YANG\_INSTALL** is unset
         &lt;the default installation directory&gt;/yang/modules
         (on Unix systems: /usr/share/yang/modules)
 
@@ -1061,7 +1076,7 @@ Options for the *yang* output format:
 :   Remove all comments from the output.
 
 **-\-yang-indent-size** *size*
-:   Format each line with a maximum indentation of *size*.  Default is 2.
+:   Format each line with an indentation of *size*.  Default is 2.
 
 **-\-yang-line-length** *len*
 :   Try to format each line with a maximum line length of *len*.  Does

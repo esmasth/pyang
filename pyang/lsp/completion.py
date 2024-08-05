@@ -16,6 +16,7 @@ from pygls.server import LanguageServer
 
 from pyang import grammar, types
 from pyang.context import Context
+from pyang.lsp import common
 from pyang.plugins import lint
 from pyang.statements import (
     ImportStatement,
@@ -178,11 +179,7 @@ def generate_stmt_snippet(
                         placeholder += '|'
                     case _:
                         if argtype in arg_enum_map:
-                            placeholder = '|'
-                            for arg_enum in arg_enum_map[argtype]:
-                                placeholder += arg_enum + ','
-                            placeholder = placeholder.rstrip(',')
-                            placeholder += '|'
+                            placeholder = f"|{','.join(arg_enum_map[argtype])}|"
                         else:
                             # TODO: use argument statement argument for extensions
                             placeholder = f':{argtype}'
@@ -344,6 +341,11 @@ def text_document_completion(
     params: lsp.CompletionParams,
 ) -> Union[List[lsp.CompletionItem], lsp.CompletionList, None]:
     """Handles LSP `textDocument/completion` request."""
+
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return None
+
     module: ModSubmodStatement | None = ls.modules[params.text_document.uri] # type: ignore
     if not module:
         return None

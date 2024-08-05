@@ -21,6 +21,11 @@ def text_document_hover(
     params: lsp.HoverParams,
 ) -> Union[lsp.Hover, None]:
     """Handles LSP `textDocument/hover` request."""
+
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return None
+
     module = ls.modules[params.text_document.uri] # type: ignore
     if not module:
         return None

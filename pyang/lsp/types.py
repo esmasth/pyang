@@ -48,6 +48,89 @@ class SemanticTokenModifier(str, enum.Enum):
     Documentation = 'documentation'
     DefaultLibrary = 'defaultLibrary'
 
+arg_type_map = {
+    'identifier': {
+        'semantic': SemanticTokenType.Class,
+    },
+    'version': {
+        'semantic': SemanticTokenType.Property,
+    },
+    'uri': {
+        'semantic': SemanticTokenType.String,
+    },
+    'date': {
+        'semantic': SemanticTokenType.Property,
+    },
+    'string': {
+        'semantic': SemanticTokenType.String,
+    },
+    'boolean': {
+        'semantic': SemanticTokenType.EnumMember,
+    },
+    'if-feature-expr': {
+        'semantic': SemanticTokenType.String,
+    },
+    'identifier-ref': {
+        'semantic': SemanticTokenType.String,
+    },
+    'fraction-digits-arg': {
+        'semantic': SemanticTokenType.String,
+    },
+    'range-arg': {
+        'semantic': SemanticTokenType.String,
+    },
+    'length-arg': {
+        'semantic': SemanticTokenType.String,
+    },
+    'enum-arg': {
+        'semantic': SemanticTokenType.EnumMember,
+    },
+    'path-arg': {
+        'semantic': SemanticTokenType.EnumMember,
+    },
+    'non-negative-integer': {
+        'semantic': SemanticTokenType.Number,
+    },
+    'status-arg': {
+        'semantic': SemanticTokenType.EnumMember,
+    },
+    'ordered-by-arg': {
+        'semantic': SemanticTokenType.EnumMember,
+    },
+    'max-value': {
+        'semantic': SemanticTokenType.Number,
+    },
+    'integer': {
+        'semantic': SemanticTokenType.Number,
+    },
+    'modifier-arg': {
+        'semantic': SemanticTokenType.Type,
+    },
+    'key-arg': {
+        'semantic': SemanticTokenType.Type,
+    },
+    'unique-arg': {
+        'semantic': SemanticTokenType.Type,
+    },
+    'descendant-schema-nodeid': {
+        'semantic': SemanticTokenType.Type,
+    },
+    'schema-nodeid': {
+        'semantic': SemanticTokenType.Type,
+    },
+    'absolute-schema-nodeid': {
+        'semantic': SemanticTokenType.Type,
+    },
+    'deviate-arg': {
+        'semantic': SemanticTokenType.EnumMember,
+    }
+}
+"""pyang `stmt_map` <argument type name> mapping to LSP
+
+Following property keys are present
+* `semantic`: LSP `SemanticTokenType` for argument type
+"""
+
 status_map = {
     'deprecated': {
         'symbol': lsp.SymbolTag.Deprecated,

@@ -38,17 +38,29 @@ class Repository(object):
 
 class FileRepository(Repository):
     def __init__(self, path="", use_env=True, no_path_recurse=False,
-                 verbose=False):
+                 ignore_path="", verbose=False):
         """Create a Repository which searches the filesystem for modules
 
         `path` is a `os.pathsep`-separated string of directories
+        `ignore_path` is a `os.pathsep`-separated string of files/directories
         """
 
         Repository.__init__(self)
         self.dirs = []
+        self.ignore_dirs = []
+        self.ignore_files = []
         self.no_path_recurse = no_path_recurse
         self.modules = None
         self.verbose = verbose
+
+        for ip in ignore_path.split(os.pathsep):
+            p = Path(ip)
+            if p.is_dir():
+                self.ignore_dirs.append(ip)
+            elif p.is_file():
+                self.ignore_files.append(ip)
+            else:
+                print(f"not file or dir: {ip}")
 
         for directory in path.split(os.pathsep):
             self._add_directory(directory)
@@ -89,11 +101,11 @@ class FileRepository(Repository):
             try:
                 import pip.locations as locations
                 location = locations.distutils_scheme('pyang')
-            except:
+            except Exception:
                 try:
                     import pip._internal.locations as locations
                     location = locations.distutils_scheme('pyang')
-                except:
+                except Exception:
                     pass
             if location is not None:
                 self._add_directory(
@@ -106,6 +118,7 @@ class FileRepository(Repository):
     def _add_directory(self, directory):
         if (not directory
             or directory in self.dirs
+            or directory in self.ignore_dirs
             or not os.path.isdir(directory)):
             return False
         self.dirs.append(directory)
@@ -121,7 +134,7 @@ class FileRepository(Repository):
             except OSError:
                 files = []
             for file_path in files:
-                if file_path.is_file():
+                if file_path.is_file() and str(file_path) not in self.ignore_files:
                     m = syntax.re_filename.search(file_path.name)
                     if m is not None:
                         name, rev, in_format = m.groups()
@@ -130,7 +143,8 @@ class FileRepository(Repository):
                         handle = in_format, str(file_path)
                         self.modules.append((name, rev, handle))
                 elif (not self.no_path_recurse
-                      and d != '.' and file_path.is_dir()):
+                      and d != '.' and file_path.is_dir()
+                      and str(file_path) not in self.ignore_dirs):
                     add_files_from_dir(file_path)
         for d in self.dirs:
             add_files_from_dir(d)

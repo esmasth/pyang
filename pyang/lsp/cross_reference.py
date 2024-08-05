@@ -51,6 +51,11 @@ def text_document_references(
     params: lsp.ReferenceParams,
 ) -> Union[List[lsp.Location], None]:
     """Handles LSP `textDocument/references` request."""
+
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return None
+
     module = ls.modules[params.text_document.uri] # type: ignore
     if not module:
         return None

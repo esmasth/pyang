@@ -13,7 +13,7 @@ from pygls.server import LanguageServer
 from pygls.workspace import TextDocument
 from pygls.uris import from_fs_path, to_fs_path
 
-from pyang import context, plugin, syntax
+from pyang import context, plugin, syntax, workspace
 from pyang.statements import ModSubmodStatement, Statement
 
 from . import (
@@ -56,19 +56,19 @@ default_port = 2087
 
 class PyangLanguageServer(LanguageServer):
     def __init__(self):
-        self.ctx : context.Context
+        self.opts : optparse.Values
+        self.ctx : context.Context # FIXME: to be removed
         self.modules : dict[str, ModSubmodStatement | None] = {}
         self.doc_symbols : dict[str, List[lsp.DocumentSymbol] | None] = {}
         self.diagnostics : dict[str, List[lsp.Diagnostic] | None] = {}
         self.handlers: List[ModuleType] = []
+        self.wfc : dict[str, workspace.WorkspaceFolderContext] = {}
 
         super().__init__(
             name=SERVER_NAME,
             version=SERVER_VERSION,
             text_document_sync_kind=lsp.TextDocumentSyncKind.Full
         )
-
-logging.basicConfig(filename='pyang-ls.log', filemode='w', level=logging.DEBUG)
 
 pyangls = PyangLanguageServer()
 
@@ -89,12 +89,6 @@ semantic_tokens.register_callbacks(pyangls)
 def add_opts(optparser: optparse.OptionParser):
     optlist = [
         # use capitalized versions of std options help and version
-        optparse.make_option("--lsp-config-schema",
-                             dest="lsp_config_schema",
-                             action="store_true",
-                             help="Generate JSON schema for supported errors " \
-                                 "and warnings as per the plugins and option " \
-                                 "codes and exit."),
         optparse.make_option("--lsp-mode",
                              dest="pyangls_mode",
                              default=default_mode,
@@ -113,15 +107,43 @@ def add_opts(optparser: optparse.OptionParser):
                              default=default_port,
                              metavar="LSP_PORT",
                              help="Bind LSP Server to this port"),
+        optparse.make_option("--lsp-log-dir",
+                             dest="pyangls_logdir",
+                             default='.',
+                             metavar="LSP_LOG_DIR",
+                             help="Write LSP Server logs at this file path"),
+        optparse.make_option("--lsp-log-level",
+                             dest="pyangls_loglevel",
+                             default='warning',
+                             metavar="LSP_LOG_LEVEL",
+                             help="Write LSP Server logs at this level" \
+                                 "Supported log levels are: " +
+                                 "debug, info, warning, error, critical"),
         ]
     g = optparser.add_option_group("LSP Server specific options")
     g.add_options(optlist)
 
-def gen_config_schema():
-    return
-
-def start_server(optargs, ctx: context.Context):
-    pyangls.ctx = ctx
+def start_server(optargs: optparse.Values):
+    if optargs.pyangls_logdir == '.':
+        log_dir = optargs.proj_dir
+    else:
+        log_dir = optargs.pyangls_logdir
+    log_filename = os.path.join(log_dir, 'pyang_ls.log')
+    match optargs.pyangls_loglevel:
+        case 'critical':
+            log_level = logging.CRITICAL
+        case 'error':
+            log_level = logging.ERROR
+        case 'warning':
+            log_level = logging.WARNING
+        case 'info':
+            log_level = logging.INFO
+        case 'debug':
+            log_level = logging.DEBUG
+        case _:
+            log_level = None
+    logging.basicConfig(filename=log_filename, filemode='w', level=log_level)
+    pyangls.opts = optargs
     if optargs.pyangls_mode == SERVER_MODE_TCP:
         pyangls.start_tcp(optargs.pyangls_host, optargs.pyangls_port)
     elif optargs.pyangls_mode == SERVER_MODE_WS:
@@ -129,7 +151,7 @@ def start_server(optargs, ctx: context.Context):
     else:
         pyangls.start_io()
 
-def _delete_from_ctx(text_doc: TextDocument):
+def _delete_from_ctx(ctx: context.Context, text_doc: TextDocument):
     if not pyangls.modules:
         return
     try:
@@ -138,31 +160,31 @@ def _delete_from_ctx(text_doc: TextDocument):
             return
     except KeyError:
         return
-    pyangls.ctx.del_module(module)
+    ctx.del_module(module)
     del pyangls.modules[text_doc.uri]
 
-def _add_to_ctx(text_doc: TextDocument):
+def _add_to_ctx(ctx: context.Context, text_doc: TextDocument):
     assert text_doc.filename
     m = syntax.re_filename.search(text_doc.filename)
     if m is not None:
         name, rev, in_format = m.groups()
         assert in_format == 'yang'
-        module = pyangls.ctx.add_module(text_doc.path, text_doc.source,
-                                        in_format, name, rev,
-                                        expect_failure_error=False,
-                                        primary_module=True)
+        module = ctx.add_module(text_doc.path, text_doc.source,
+                                in_format, name, rev,
+                                expect_failure_error=False,
+                                primary_module=True)
     else:
-        module = pyangls.ctx.add_module(text_doc.path, text_doc.source,
-                                        primary_module=True)
+        module = ctx.add_module(text_doc.path, text_doc.source,
+                                primary_module=True)
     # if module:
     pyangls.modules[text_doc.uri] = module
     return module
 
-def _update_ctx_modules():
+def _update_ctx_modules(ctx: context.Context):
     for text_doc in pyangls.workspace.documents.values():
-        _delete_from_ctx(text_doc)
+        _delete_from_ctx(ctx, text_doc)
     for text_doc in pyangls.workspace.documents.values():
-        _add_to_ctx(text_doc)
+        _add_to_ctx(ctx, text_doc)
 
 def _clear_stmt_validation(stmt: Statement):
     stmt.i_is_validated = False
@@ -170,32 +192,32 @@ def _clear_stmt_validation(stmt: Statement):
     for substmt in stmt.substmts:
         _clear_stmt_validation(substmt)
 
-def _clear_ctx_validation():
+def _clear_ctx_validation(ctx: context.Context):
     pyangls.doc_symbols = {}
     pyangls.diagnostics = {}
     # pyangls.ctx.internal_reset()
-    pyangls.ctx.errors = []
+    ctx.errors = []
     module : Statement
-    for module in pyangls.ctx.modules.values():
+    for module in ctx.modules.values():
         module.internal_reset()
         # _clear_stmt_validation(module)
 
-def _validate_ctx_modules():
+def _validate_ctx_modules(ctx: context.Context):
     # ls.show_message_log("Validating YANG...")
-    modules = common.get_ctx_modules(pyangls.ctx)
+    modules = common.get_ctx_modules(ctx)
 
     p : plugin.PyangPlugin
 
     for p in plugin.plugins:
-        p.pre_validate_ctx(pyangls.ctx, modules)
+        p.pre_validate_ctx(ctx, modules)
 
-    pyangls.ctx.validate()
+    ctx.validate()
 
     for _m in modules:
         _m.prune()
 
     for p in plugin.plugins:
-        p.post_validate_ctx(pyangls.ctx, modules)
+        p.post_validate_ctx(ctx, modules)
 
 def _get_folder_yang_uris(folder_uri) -> List[str]:
     """Recursively find all .yang files in the given folder."""
@@ -222,16 +244,19 @@ def _process_workspace_configuration(_scope: str | None, _config: List[Any]):
 
 @pyangls.feature(lsp.INITIALIZED)
 def initialized(
-    ls: LanguageServer,
+    ls: PyangLanguageServer,
     _params: lsp.InitializedParams,
 ):
     """Handles LSP `initialized` notification."""
 
-    def add_workspace_folder(uri: str):
-        _clear_ctx_validation()
+    def init_workspace_folder(wfc: workspace.WorkspaceFolderContext, uri: str):
+        ls.ctx = wfc.ctx
+        _clear_ctx_validation(wfc.ctx)
         yang_uris = _get_folder_yang_uris(uri)
         for yang_uri in yang_uris:
             if not yang_uri in ls.workspace.text_documents.keys():
+                if wfc.is_ignored(yang_uri):
+                    continue
                 yang_file = to_fs_path(yang_uri)
                 assert yang_file
                 with open(yang_file, 'r', encoding='utf-8') as file:
@@ -245,22 +270,45 @@ def initialized(
                         text=yang_source,
                     )
                 )
-        _update_ctx_modules()
-        _validate_ctx_modules()
+        _update_ctx_modules(wfc.ctx)
+        _validate_ctx_modules(wfc.ctx)
         diagnostics.publish_workspace_diagnostics(ls)
 
     if ls.workspace.folders:
         # TODO: Handle more than one workspace folder
         folder = next(iter(ls.workspace.folders.values()))
-        add_workspace_folder(folder.uri)
-    # fallback to pre 3.6.0
+        path = to_fs_path(folder.uri)
+        if path:
+            wfc = workspace.WorkspaceFolderContext(
+                name=folder.name,
+                path=path,
+                opts=ls.opts,
+            )
+            ls.wfc[folder.uri] = wfc
+            init_workspace_folder(wfc, folder.uri)
+    # fallback to pre 3.6.0, emacs/lsp-mode requires it
     elif ls.workspace.root_uri:
-        add_workspace_folder(ls.workspace.root_uri)
+        path = to_fs_path(ls.workspace.root_uri)
+        if path:
+            wfc = workspace.WorkspaceFolderContext(
+                name=ls.workspace.root_uri,
+                path=path,
+                opts=ls.opts,
+            )
+            ls.wfc[ls.workspace.root_uri] = wfc
+            init_workspace_folder(wfc, ls.workspace.root_uri)
     # fallback to pre 3.0
     elif ls.workspace.root_path:
         uri = from_fs_path(ls.workspace.root_path)
         if uri:
-            add_workspace_folder(uri)
+            wfc = workspace.WorkspaceFolderContext(
+                name=uri,
+                path=ls.workspace.root_path,
+                opts=ls.opts,
+            )
+            ls.wfc[uri] = wfc
+            if uri:
+                init_workspace_folder(wfc, uri)
 
 
 ################################################################################
@@ -277,6 +325,11 @@ def text_document_did_open(
 ):
     """Handles LSP `textDocument/didOpen` notification."""
 
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return
+    ctx = wfc.ctx
+
     text_doc = ls.workspace.get_text_document(params.text_document.uri)
     orig_source = text_doc._source
 
@@ -290,9 +343,9 @@ def text_document_did_open(
         return
 
     # File content of opened file is not matching ex
-    _clear_ctx_validation()
-    _update_ctx_modules()
-    _validate_ctx_modules()
+    _clear_ctx_validation(ctx)
+    _update_ctx_modules(ctx)
+    _validate_ctx_modules(ctx)
     diagnostics.publish_workspace_diagnostics(ls)
 
 
@@ -305,13 +358,18 @@ def text_document_did_change(
 ):
     """Handles LSP `textDocument/didChange` notification."""
 
-    _clear_ctx_validation()
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return
+    ctx = wfc.ctx
+
+    _clear_ctx_validation(ctx)
 
     for content_change in params.content_changes:
         ls.workspace.update_text_document(params.text_document, content_change)
 
-    _update_ctx_modules()
-    _validate_ctx_modules()
+    _update_ctx_modules(ctx)
+    _validate_ctx_modules(ctx)
     diagnostics.publish_workspace_diagnostics(ls)
 
 
@@ -321,6 +379,11 @@ def text_document_did_close(
     params: lsp.DidCloseTextDocumentParams,
 ):
     """Handles LSP `textDocument/didClose` notification."""
+
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return
+    ctx = wfc.ctx
 
     text_doc = ls.workspace.get_text_document(params.text_document.uri)
     orig_source = text_doc._source
@@ -338,9 +401,9 @@ def text_document_did_close(
     # textDocument/didChange notification before textDocument/didClose for the
     # case when an edited buffer window is killed without saving so that the
     # project diagnostics are still consistent
-    _clear_ctx_validation()
-    _update_ctx_modules()
-    _validate_ctx_modules()
+    _clear_ctx_validation(ctx)
+    _update_ctx_modules(ctx)
+    _validate_ctx_modules(ctx)
     diagnostics.publish_workspace_diagnostics(ls)
 
 
@@ -367,7 +430,8 @@ def workspace_did_change_configuration(
 
     # TODO: Handle config changes including ignoring additional files/subdirs
     _process_workspace_configuration(None, [params.settings])
-    _clear_ctx_validation()
+    for wfc in ls.wfc.values():
+        _clear_ctx_validation(wfc.ctx)
 
     if ls.workspace.folders:
         # TODO: Handle more than one workspace folder
@@ -389,9 +453,10 @@ def workspace_did_change_configuration(
                     )
                 )
 
-    _update_ctx_modules()
-
-    _validate_ctx_modules()
+    for wfc in ls.wfc.values():
+        _update_ctx_modules(wfc.ctx)
+        _validate_ctx_modules(wfc.ctx)
+    # TODO: Change API to be per worspace folder
     diagnostics.publish_workspace_diagnostics(ls)
 
 
@@ -402,7 +467,12 @@ def workspace_did_change_watched_files(
 ):
     """Handles LSP `workspace/didChangeWatchedFiles` notification."""
 
-    _clear_ctx_validation()
+    # XXX: Presuming all changes in a notification are from the same folder
+    wfc = common.get_workspace_folder_context(ls, params.changes[0].uri)
+    if not wfc:
+        return
+    ctx = wfc.ctx
+    _clear_ctx_validation(ctx)
 
     # Process all the Deleted events first to handle renames gracefully
     for event in params.changes:
@@ -411,7 +481,7 @@ def workspace_did_change_watched_files(
 
         text_doc = ls.workspace.get_text_document(event.uri)
         ls.workspace.remove_text_document(text_doc.uri)
-        _delete_from_ctx(text_doc)
+        _delete_from_ctx(ctx, text_doc)
         diagnostics.publish_document_diagnostics(ls, text_doc, [])
 
     for event in params.changes:
@@ -433,8 +503,8 @@ def workspace_did_change_watched_files(
             text_doc = ls.workspace.get_text_document(event.uri)
             text_doc._source = None
 
-    _update_ctx_modules()
-    _validate_ctx_modules()
+    _update_ctx_modules(ctx)
+    _validate_ctx_modules(ctx)
     diagnostics.publish_workspace_diagnostics(ls)
 
 

@@ -14,6 +14,7 @@ from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
 from pyang.error import Position
+from pyang.lsp import common
 from pyang.statements import LeafLeaflistStatement, Statement
 
 
@@ -145,6 +146,11 @@ def text_document_inlay_hint(
     params: lsp.InlayHintParams,
 ) -> Union[List[lsp.InlayHint], None]:
     """Handles LSP `textDocument/inlayHint` request."""
+
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return None
+
     module = ls.modules[params.text_document.uri] # type: ignore
     if not module:
         return None

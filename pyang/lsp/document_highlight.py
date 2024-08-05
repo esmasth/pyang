@@ -9,6 +9,8 @@ from typing import List, Union
 from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
+from pyang.lsp import common
+
 from . import glue
 
 
@@ -17,6 +19,11 @@ def text_document_document_highlight(
     params: lsp.DocumentHighlightParams,
 ) -> Union[List[lsp.DocumentHighlight], None]:
     """Handles LSP `textDocument/documentHighlight` request."""
+
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return None
+
     module = ls.modules[params.text_document.uri] # type: ignore
     if not module:
         return None

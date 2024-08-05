@@ -11,6 +11,8 @@ from typing import List, Tuple, Union
 from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
+from pyang.lsp import common
+
 
 def linechar(source: str, offset: int) -> Tuple[int, int]:
     sliced = source[:offset]
@@ -147,6 +149,11 @@ def text_document_document_link(
     params: lsp.DocumentLinkParams,
 ) -> Union[List[lsp.DocumentLink], None]:
     """Handles LSP `textDocument/documentLink` request."""
+
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return None
+
     links = []
     text_doc = ls.workspace.get_text_document(params.text_document.uri)
     source = text_doc.source

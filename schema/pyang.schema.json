@@ -1,0 +1,160 @@
+{
+    "$schema": "https://json-schema.org/draft-07/schema#",
+    "$id": "https://raw.githubusercontent.com/esmasth/pyang/esmasth/lsp/schema/pyang.schema.json",
+    "title": "pyang configuration schema",
+    "description": "JSON Schema for pyang Configuration JSON",
+    "markdownDescription": "JSON Schema for `pyang` Configuration JSON",
+    "definitions": {
+        "error_code": {
+            "enum": [
+                "KEY_HAS_DEFAULT"
+            ]
+        }
+    },
+    "properties": {
+        "$schema": {
+            "type": "string"
+        },
+        "search": {
+            "title": "YANG module search configuration section",
+            "type": "object",
+            "properties": {
+                "useDefaults": {
+                    "description": "Use default module search paths: current directory i.e. \".\", $YANG_MODULEPATH, $HOME/yang/modules, $YANG_INSTALL/yang_modules e.g., /usr/share/yang/modules",
+                    "markdownDescription": "Use default module search paths: current directory i.e. `.`, `$YANG_MODULEPATH`, `$HOME/yang/modules`, `$YANG_INSTALL/yang_modules` e.g. `/usr/share/yang/modules`",
+                    "type": "boolean",
+                    "default": true
+                },
+                "paths": {
+                    "description": "Additional search paths for imported modules",
+                    "type": "array",
+                    "items": {
+                        "description": "Additional path",
+                        "type": "string"
+                    }
+                },
+                "pathRecurse": {
+                    "description": "If this parameter is set to \"true\", directories in the search paths are not recursively scanned for modules, except current directory i.e. \".\" which is never recursed",
+                    "markdownDescription": "If this parameter is set to `true`, directories in the search paths are not recursively scanned for modules, except current directory i.e. `.` which is never recursed",
+                    "type": "boolean",
+                    "default": true
+                },
+                "ignorePaths": {
+                    "description": "Paths which are ignored while searching for YANG modules. Can include path to YANG models. No glob patterns are supported.",
+                    "type": "array",
+                    "items": {
+                        "description": "Ignored path",
+                        "type": "string"
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "lint": {
+            "title": "Validation configuration section",
+            "type": "object",
+            "properties": {
+                "warningsAsErrors": {
+                    "description": "Treat warnings as errors",
+                    "type": "boolean",
+                    "default": false
+                },
+                "ignoreErrors": {
+                    "description": "Ignored errors",
+                    "type": "array",
+                    "items": {
+                        "description": "error code",
+                        "$ref": "#/definitions/error_code"
+                    }
+                },
+                "rfc8407": {
+                    "description": "Validate according to the generic YANG guideline as specified in RFC 8407",
+                    "markdownDescription": "Validate according to the generic YANG guideline as specified in [RFC 8407](https://datatracker.ietf.org/doc/html/rfc8407)",
+                    "type": "boolean",
+                    "default": false
+                },
+                "canonical": {
+                    "description": "Whether statements out of YANG RFC ABNF specified canonical order are flagged",
+                    "markdownDescription": "Whether statements out of [YANG RFC ABNF](https://datatracker.ietf.org/doc/html/rfc7950#section-14) specified canonical order are flagged",
+                    "type": "boolean",
+                    "default": false
+                },
+                "longLine": {
+                    "description": "Give a warning if any line is longer than \"length\"",
+                    "markdownDescription": "Give a warning if any line is longer than `length`",
+                    "type": "object",
+                    "properties": {
+                        "length": {
+                            "description": "Maximum valid line length.",
+                            "type": "number",
+                            "minimum": 80,
+                            "default": 80
+                        }
+                    }
+                },
+                "longIdentifier": {
+                    "description": "Give a warning if any identifier is longer than \"length\"",
+                    "markdownDescription": "Give a warning if any identifier is longer than `length`",
+                    "type": "object",
+                    "properties": {
+                        "length": {
+                            "description": "Maximum valid identifier length.",
+                            "type": "number",
+                            "minimum": 16,
+                            "default": 64
+                        }
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "format": {
+            "title": "Formatting configuration section",
+            "type": "object",
+            "properties": {
+                "yang": {
+                    "title": "YANG output format specifics",
+                    "type": "object",
+                    "properties": {
+                        "canonical": {
+                            "description": "Whether statements should be reordered as per YANG RFC ABNF specified canonical order",
+                            "markdownDescription": "Whether statements should be reordered as per [YANG RFC ABNF](https://datatracker.ietf.org/doc/html/rfc7950#section-14) specified canonical order",
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "removeUnusedImports": {
+                            "description": "Remove unused import statements from the output",
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "removeComments": {
+                            "description": "Remove all comments from the output",
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "indentSize": {
+                            "description": "Format each line with this indentation",
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 2
+                        },
+                        "longLine": {
+                            "description": "Try to format each line with a maximum line length of \"length\".  Does not reformat long lines within strings",
+                            "markdownDescription": "Try to format each line with a maximum line length of `length`.  Does not reformat long lines within strings",
+                            "type": "object",
+                            "properties": {
+                                "length": {
+                                    "description": "Maximum allowed line length.",
+                                    "type": "number",
+                                    "minimum": 80,
+                                    "default": 80
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "additionalProperties": false
+}

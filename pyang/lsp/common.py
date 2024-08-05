@@ -1,6 +1,9 @@
 """Common functions to traverse pyang structures"""
 
-from typing import List
+from typing import List, Union
+
+from lsprotocol.types import WorkspaceFolder
+from pygls.server import LanguageServer
 
 from pyang import error, types, util, yang_parser
 from pyang.context import Context
@@ -14,7 +17,21 @@ from pyang.statements import (
     TypeStatement,
     UsesStatement,
 )
+from pyang.workspace import WorkspaceFolderContext
 
+
+def get_workspace_folder_context(
+    ls: LanguageServer,
+    doc_uri: str
+) -> Union[WorkspaceFolderContext, None]:
+    folder: WorkspaceFolder
+    for folder in ls.workspace.folders.values(): # type: ignore
+        wfc = ls.wfc[folder.uri] # type: ignore
+        if doc_uri.startswith(folder.uri):
+            if wfc.is_ignored(doc_uri):
+                return None
+            return wfc
+    return None
 
 def have_parser_errors(ctx: Context) -> bool:
     for _, etag, _ in ctx.errors:

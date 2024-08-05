@@ -1,20 +1,26 @@
 #!/usr/bin/env python
 from __future__ import absolute_import
-import sys
+import io
+import json
 import os
 import optparse
-import io
-import shutil
 from pathlib import Path
+import shutil
+import sys
+# from typing import List
+
+# import urllib
+# import urllib.parse
 
 import pyang
 from pyang import plugin
 from pyang import error
 from pyang import util
 from pyang import hello
-from pyang import context
-from pyang import repository
+# from pyang import context
+# from pyang import repository
 from pyang import syntax
+from pyang import workspace
 from pyang.lsp import server as pyangls
 
 
@@ -55,6 +61,14 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
                              help="Show version number and exit"),
         optparse.make_option("-V", "--verbose",
                              action="store_true"),
+        optparse.make_option("-c", "--config",
+                             dest="config",
+                             action="store_true",
+                             help="Use specified configuration file"),
+        optparse.make_option("--project-dir",
+                             dest="proj_dir",
+                             default=".",
+                             help="Use specified directory as project root"),
         optparse.make_option("-g", "--list-errors",
                              dest="list_errors",
                              action="store_true",
@@ -175,6 +189,12 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
                              action="append",
                              help=os.pathsep + "-separated search path for yin"
                              " and yang modules"),
+        optparse.make_option("--ignore-path",
+                             dest="ignore_path",
+                             default=[],
+                             action="append",
+                             help=os.pathsep + "-separated search ignore path" \
+                             "for yin and yang modules"),
         optparse.make_option("--plugindir",
                              dest="plugindir",
                              help="Load pyang plugins from PLUGINDIR"),
@@ -232,6 +252,31 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
 
     (o, args) = optparser.parse_args()
 
+    user_cfg_path = os.path.join(os.path.expanduser('~'), '.pyang.json')
+    if os.path.exists(user_cfg_path) and os.path.isfile(user_cfg_path):
+        with open(user_cfg_path, 'r', encoding='utf-8') as user_cfg_file:
+            user_cfg = json.load(user_cfg_file)
+    proj_dir = os.path.abspath(o.proj_dir)
+
+    if o.verbose:
+        sys.stderr.write(f"# current directory: {os.path.abspath(os.path.curdir)}\n")
+        if os.path.exists(user_cfg_path) and os.path.isfile(user_cfg_path):
+            sys.stderr.write(f"# user config: {user_cfg_path}\n")
+            sys.stderr.write(json.dumps(user_cfg, indent=4) + '\n')
+        sys.stderr.write(f"# cli arguments: {str(sys.argv)}\n")
+        sys.stderr.write(f"# project directory: {proj_dir}\n")
+
+    if o.lsp:
+        try:
+            pyangls.try_import_deps()
+        except ModuleNotFoundError as e:
+            print("LSP feature required external dependencies are missing")
+            print(str(e))
+            print("Please resolve dependencies to use pyang as an LSP server")
+            sys.exit(1)
+        pyangls.start_server(o)
+        sys.exit(0)
+
     if o.outfile is not None and o.format is None and o.lsp is None:
         sys.stderr.write("no format specified\n")
         sys.exit(1)
@@ -253,33 +298,128 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
             fd = sys.stdin.buffer
         hel = hello.HelloParser().parse(fd)
 
-    path = os.pathsep.join(o.path)
+    # if o.config:
+    #     config_path = os.path.abspath(o.config)
+    # else:
+    #     config_path = os.path.join(proj_dir, '.pyang.json')
+    # path = ''
+    # ignore_path = ''
+    # cfg_paths: List[str] = []
+    # cfg_ignore_paths = []
+    # cfg = None
+    # if os.path.exists(config_path) and os.path.isfile(config_path):
+    #     if o.verbose:
+    #         sys.stderr.write(f"# project config: {os.path.abspath(config_path)}\n")
+    #     with open(config_path, 'r', encoding='utf-8') as config_file:
+    #         cfg = json.load(config_file)
+    #         if o.verbose:
+    #             sys.stderr.write(json.dumps(cfg, indent=4) + '\n')
+    #         try:
+    #             cfg_paths = cfg["search"]["paths"]
+    #             cfg_ignore_paths = cfg["search"]["ignorePaths"]
+    #         except KeyError:
+    #             pass
 
-    # add standard search path
-    if len(o.path) == 0:
-        path = "."
-    else:
-        path += os.pathsep + "."
+    # path = ''
+    # for cfg_path in cfg_paths:
+    #     if not os.path.isabs(cfg_path):
+    #         cfg_path = os.path.join(proj_dir, cfg_path)
+    #     if path:
+    #         path = os.pathsep.join([path, cfg_path])
+    #     else:
+    #         path = cfg_path
+    # # path = o.path
 
-    if o.no_env_path:
-        use_env = False
-    else:
-        use_env = True
-    repos = repository.FileRepository(path, use_env,
-                                      no_path_recurse=o.no_path_recurse,
-                                      verbose=o.verbose)
+    # default_dirs = "."
+    # if o.proj_dir != ".":
+    #     default_dirs += os.pathsep + "."
+    # # add standard search path
+    # if len(o.path) == 0:
+    #     path = default_dirs
+    # else:
+    #     path += os.pathsep + default_dirs
 
-    ctx = context.Context(repos)
+    # ignore_path = ''
+    # for cfg_ignore_path in cfg_ignore_paths:
+    #     if not os.path.isabs(cfg_ignore_path):
+    #         cfg_ignore_path = os.path.join(proj_dir, cfg_ignore_path)
+    #     if ignore_path:
+    #         ignore_path = os.pathsep.join([ignore_path, cfg_ignore_path])
+    #     else:
+    #         ignore_path = cfg_ignore_path
+    # # ignore_path = o.ignore_path
 
-    ctx.opts = o
-    ctx.canonical = o.canonical
+    # no_path_recurse = False
+    # if o.no_path_recurse:
+    #     no_path_recurse = o.no_path_recurse
+    # elif cfg:
+    #     try:
+    #         no_path_recurse = not cfg["search"]["pathRecurse"]
+    #     except KeyError:
+    #         pass
+
+    # use_env = True
+    # if o.no_env_path is not None:
+    #     use_env = not o.no_env_path
+    # elif cfg:
+    #     try:
+    #         use_env = cfg["search"]["useDefaults"]
+    #     except KeyError:
+    #         pass
+
+    # repos = repository.FileRepository(path=path,
+    #                                   use_env=use_env,
+    #                                   no_path_recurse=no_path_recurse,
+    #                                   ignore_path=ignore_path,
+    #                                   verbose=o.verbose)
+
+    # ctx = context.Context(repos)
+
+    # ctx.opts = o
+    # ctx.cfg = cfg
+
+    # if o.canonical is not None:
+    #     ctx.canonical = o.canonical
+    # elif cfg:
+    #     try:
+    #         ctx.canonical = cfg["lint"]["canonical"]
+    #     except KeyError:
+    #         pass
+
+    # if o.max_line_len is not None:
+    #     ctx.max_line_len = o.max_line_len
+    # elif cfg:
+    #     try:
+    #         if cfg["lint"]["longLine"]:
+    #             ctx.max_line_len = cfg["lint"]["longLine"]["length"]
+    #     except KeyError:
+    #         pass
+
+    # if o.max_identifier_len is not None:
+    #     ctx.max_identifier_len = o.max_identifier_len
+    # elif cfg:
+    #     try:
+    #         if cfg["lint"]["longIdentifier"]:
+    #             ctx.max_identifier_len = cfg["lint"]["longIdentifier"]["length"]
+    #     except KeyError:
+    #         pass
+
+    # if o.strict is not None:
+    #     ctx.strict = o.strict
+    # elif cfg:
+    #     try:
+    #         ctx.strict = cfg["lint"]["strict"]
+    #     except KeyError:
+    #         pass
+
+    wsf = workspace.WorkspaceFolderContext(name='cli', path=proj_dir, opts=o)
+    ctx = wsf.ctx
+    cfg = ctx.cfg # type: ignore
+
     ctx.verify_revision_history = o.verify_revision_history
-    ctx.max_line_len = o.max_line_len
-    ctx.max_identifier_len = o.max_identifier_len
     ctx.trim_yin = o.trim_yin
     ctx.lax_xpath_checks = o.lax_xpath_checks
     ctx.lax_quote_checks = o.lax_quote_checks
-    ctx.strict = o.strict
     ctx.max_status = o.max_status
 
     # make a map of features to support, per module
@@ -301,8 +441,7 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
         p.setup_ctx(ctx)
 
     if o.list_errors is True:
-        for tag in error.error_codes:
-            (level, fmt) = error.error_codes[tag]
+        for tag, (level, fmt) in error.error_codes.items():
             if error.is_warning(level):
                 print("Warning: %s" % tag)
             elif error.allow_warning(level):
@@ -311,10 +450,6 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
                 print("Error:   %s" % tag)
             print("Message: %s" % fmt)
             print("")
-        sys.exit(0)
-
-    if o.lsp_config_schema is True:
-        pyangls.gen_config_schema()
         sys.exit(0)
 
     # patch the error spec so that -W errors are treated as warnings
@@ -352,17 +487,6 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
 
     for p in plugin.plugins:
         p.pre_load_modules(ctx)
-
-    if o.lsp:
-        try:
-            pyangls.try_import_deps()
-            pyangls.start_server(o, ctx)
-            sys.exit(0)
-        except ModuleNotFoundError as e:
-            print("LSP feature required external dependencies are missing")
-            print(str(e))
-            print("Please resolve dependencies to use pyang as an LSP server")
-            sys.exit(1)
 
     exit_code = 0
     modules = []
@@ -529,6 +653,12 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
     for epos, etag, eargs in ctx.errors:
         if etag in o.ignore_error_tags:
             continue
+        if cfg:
+            try:
+                if etag in cfg['lint']['ignoreErrors']:
+                    continue
+            except KeyError:
+                pass
         if (ctx.implicit_errors is False and
             epos.top is not None and
             epos.top.arg not in modulenames and

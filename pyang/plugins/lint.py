@@ -69,6 +69,11 @@ class LintPlugin(plugin.PyangPlugin):
     def setup_ctx(self, ctx):
         if not ctx.opts.lint:
             return
+        try:
+            if not ctx.cfg or not ctx.cfg["lint"]["rfc8407"]:
+                return
+        except KeyError:
+            return
         self._setup_ctx(ctx)
 
     def _setup_ctx(self, ctx):
