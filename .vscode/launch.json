@@ -66,7 +66,7 @@
 				// "--ignore-path=/home/esmasth/code/m-plane-yang/Imported Models/ietf-interfaces.yang",
 				"--ericsson",
 				"--ericsson-omp",
-				"--project-dir=/home/esmasth/code/m-plane-yang",
+				// "--project-dir=/home/esmasth/code/m-plane-yang",
 				"--path=/home/esmasth/code/m-plane-yang/Imported Models",
 				"--path=/home/esmasth/code/m-plane-yang/Ericsson Models",
 				"--path=/home/esmasth/code/m-plane-yang/Ericsson Models/EYANG",

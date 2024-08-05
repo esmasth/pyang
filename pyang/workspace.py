@@ -64,7 +64,7 @@ class WorkspaceFolderContext:
                 path = os.pathsep.join([path, cfg_path])
             else:
                 path = cfg_path
-        # path = o.path
+        path = os.pathsep.join(o.path + [path])
 
         default_dirs = "."
         if o.proj_dir != ".":
@@ -83,7 +83,7 @@ class WorkspaceFolderContext:
                 ignore_path = os.pathsep.join([ignore_path, cfg_ignore_path])
             else:
                 ignore_path = cfg_ignore_path
-        # ignore_path = o.ignore_path
+        ignore_path = os.pathsep.join(o.ignore_path + [ignore_path])
 
         no_path_recurse = False
         if o.no_path_recurse:
