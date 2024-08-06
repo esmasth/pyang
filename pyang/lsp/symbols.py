@@ -332,7 +332,7 @@ async def text_document_document_symbol(
     try:
         module = ls.modules[params.text_document.uri] # type: ignore
         if module is None:
-            if common.have_parser_errors(ls.ctx): # type: ignore
+            if common.have_parser_errors(wfc.ctx):
                 ls.show_message_log("Syntactically invalid document is not outlined.",
                                     msg_type=lsp.MessageType.Debug)
             return None
@@ -347,7 +347,7 @@ async def text_document_document_symbol(
 
     symbols = []
     for substmt in module.substmts:
-        module_symbols = _build_doc_stmt_symbols(ls.ctx, substmt) # type: ignore
+        module_symbols = _build_doc_stmt_symbols(wfc.ctx, substmt)
         if module_symbols:
             symbols.append(module_symbols)
     ls.doc_symbols[params.text_document.uri] = symbols # type: ignore
@@ -364,11 +364,12 @@ def workspace_symbol(
         return None
 
     symbols = []
-    for doc_uri in ls.workspace.text_documents:
-        module = ls.modules[doc_uri] # type: ignore
-        if not module:
-            continue
-        symbols += _build_ws_stmt_symbols(ls.ctx, module, doc_uri, params.query, None) # type: ignore
+    for wfc in ls.wfc.values(): # type: ignore
+        for doc_uri in ls.workspace.text_documents:
+            module = ls.modules[doc_uri] # type: ignore
+            if not module:
+                continue
+            symbols += _build_ws_stmt_symbols(wfc.ctx, module, doc_uri, params.query, None)
     return symbols
 
 

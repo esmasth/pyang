@@ -17,22 +17,27 @@ from pygls.workspace import TextDocument
 
 from pyang import error
 from pyang.plugins import lint
+from pyang.workspace import WorkspaceFolderContext
 
 pyangls = None
 
-def _build_doc_diagnostics(ls: LanguageServer, ref: str) -> List[lsp.Diagnostic]:
+def _build_doc_diagnostics(
+    wfc: WorkspaceFolderContext,
+    ref: str
+) -> List[lsp.Diagnostic]:
     """Builds lsp diagnostics from pyang context"""
     diagnostics = []
+    ls = wfc.ls # type: ignore
     # TODO: revisit sorting. VS code seems to prefer ordering on line numbers
-    ls.ctx.errors.sort(key=lambda e: (e[0].ref, e[0].line), reverse=True) # type: ignore
-    for epos, etag, eargs in ls.ctx.errors: # type: ignore
+    wfc.ctx.errors.sort(key=lambda e: (e[0].ref, e[0].line), reverse=True)
+    for epos, etag, eargs in wfc.ctx.errors:
         if epos.ref != ref:
             continue
-        if etag in ls.ctx.opts.ignore_error_tags:
+        if etag in wfc.ctx.opts.ignore_error_tags: # type: ignore
             continue
-        if ls.ctx.cfg:
+        if wfc.ctx.cfg: # type: ignore
             try:
-                if etag in ls.ctx.cfg['lint']['ignoreErrors']:
+                if etag in wfc.ctx.cfg['lint']['ignoreErrors']: # type: ignore
                     continue
             except KeyError:
                 pass
@@ -43,13 +48,12 @@ def _build_doc_diagnostics(ls: LanguageServer, ref: str) -> List[lsp.Diagnostic]
             start_col = epos.arg_schar
             end_line = epos.arg_eline
             end_col = epos.arg_echar
-            if etag == 'LONG_LINE' and ls.ctx.max_line_len is not None: # type: ignore
-                start_line = epos.line - 1
-                start_col = ls.ctx.max_line_len # type: ignore
+            if etag == 'LONG_LINE' and wfc.ctx.max_line_len is not None:
+                start_col = wfc.ctx.max_line_len
                 end_line = epos.line
                 end_col = 0
-            elif etag == 'LONG_IDENTIFIER' and ls.ctx.max_identifier_len is not None: # type: ignore
-                start_col = epos.arg_schar + ls.ctx.max_identifier_len # type: ignore
+            elif etag == 'LONG_IDENTIFIER' and wfc.ctx.max_identifier_len is not None:
+                start_col = epos.arg_schar + wfc.ctx.max_identifier_len
             elif 'KEYWORD' in etag:
                 start_line = epos.kwd_sline
                 start_col = epos.kwd_schar
@@ -63,8 +67,8 @@ def _build_doc_diagnostics(ls: LanguageServer, ref: str) -> List[lsp.Diagnostic]
         def line_to_lsp_range(etag: str, line: int) -> lsp.Range:
             # pyang just stores line context, not keyword/argument context
             start_line = line - 1
-            if etag == 'LONG_LINE' and ls.ctx.max_line_len is not None: # type: ignore
-                start_col = ls.ctx.max_line_len # type: ignore
+            if etag == 'LONG_LINE' and wfc.ctx.max_line_len is not None:
+                start_col = wfc.ctx.max_line_len
             else:
                 start_col = 0
             end_line = line
@@ -153,24 +157,25 @@ def _build_doc_diagnostics(ls: LanguageServer, ref: str) -> List[lsp.Diagnostic]
     return diagnostics
 
 def publish_document_diagnostics(
-    ls: LanguageServer,
+    wfc: WorkspaceFolderContext,
     text_doc: TextDocument,
     diagnostics: List[lsp.Diagnostic] | None = None
 ):
-    if not ls.client_capabilities.text_document:
+    ls: LanguageServer = wfc.ls # type: ignore
+    if not ls.client_capabilities.text_document \
+        or not ls.client_capabilities.text_document.publish_diagnostics:
         return
-    if not ls.client_capabilities.text_document.publish_diagnostics:
-        return
+
     if not diagnostics:
-        diagnostics = _build_doc_diagnostics(ls, text_doc.path)
+        diagnostics = _build_doc_diagnostics(wfc, text_doc.path)
     ls.publish_diagnostics(text_doc.uri, diagnostics)
     ls.diagnostics[text_doc.uri] = diagnostics # type: ignore
 
-def publish_workspace_diagnostics(
-    ls: LanguageServer,
-):
+def publish_workspace_folder_diagnostics(wfc: WorkspaceFolderContext):
+    ls: LanguageServer = wfc.ls # type: ignore
     for text_doc in ls.workspace.text_documents.values():
-        publish_document_diagnostics(ls, text_doc)
+        # TODO: Filter workspace folder documents
+        publish_document_diagnostics(wfc, text_doc)
 
 
 # def text_document_diagnostic(

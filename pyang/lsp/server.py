@@ -195,7 +195,6 @@ def _clear_stmt_validation(stmt: Statement):
 def _clear_ctx_validation(ctx: context.Context):
     pyangls.doc_symbols = {}
     pyangls.diagnostics = {}
-    # pyangls.ctx.internal_reset()
     ctx.errors = []
     module : Statement
     for module in ctx.modules.values():
@@ -250,7 +249,7 @@ def initialized(
     """Handles LSP `initialized` notification."""
 
     def init_workspace_folder(wfc: workspace.WorkspaceFolderContext, uri: str):
-        ls.ctx = wfc.ctx
+        wfc.ls = ls # type: ignore
         _clear_ctx_validation(wfc.ctx)
         yang_uris = _get_folder_yang_uris(uri)
         for yang_uri in yang_uris:
@@ -272,20 +271,24 @@ def initialized(
                 )
         _update_ctx_modules(wfc.ctx)
         _validate_ctx_modules(wfc.ctx)
-        diagnostics.publish_workspace_diagnostics(ls)
+        diagnostics.publish_workspace_folder_diagnostics(wfc)
 
     if ls.workspace.folders:
         # TODO: Handle more than one workspace folder
-        folder = next(iter(ls.workspace.folders.values()))
-        path = to_fs_path(folder.uri)
-        if path:
-            wfc = workspace.WorkspaceFolderContext(
-                name=folder.name,
-                path=path,
-                opts=ls.opts,
-            )
-            ls.wfc[folder.uri] = wfc
-            init_workspace_folder(wfc, folder.uri)
+        if len(ls.workspace.folders) > 1:
+            ls.show_message("pyang does not support multiple workspace folders yet! "
+                            "First folder in workspace is supported as best effort.",
+                            lsp.MessageType.Warning)
+        for folder in ls.workspace.folders.values():
+            path = to_fs_path(folder.uri)
+            if path:
+                wfc = workspace.WorkspaceFolderContext(
+                    name=folder.name,
+                    path=path,
+                    opts=ls.opts,
+                )
+                ls.wfc[folder.uri] = wfc
+                init_workspace_folder(wfc, folder.uri)
     # fallback to pre 3.6.0, emacs/lsp-mode requires it
     elif ls.workspace.root_uri:
         path = to_fs_path(ls.workspace.root_uri)
@@ -328,7 +331,6 @@ def text_document_did_open(
     wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
     if not wfc:
         return
-    ctx = wfc.ctx
 
     text_doc = ls.workspace.get_text_document(params.text_document.uri)
     orig_source = text_doc._source
@@ -339,14 +341,14 @@ def text_document_did_open(
     if params.text_document.text == orig_source:
         # Some LSP clients like Emacs/eglot do not consume an earlier diagnostic
         # publishing for the
-        diagnostics.publish_document_diagnostics(ls, text_doc)
+        diagnostics.publish_document_diagnostics(wfc, text_doc)
         return
 
     # File content of opened file is not matching ex
-    _clear_ctx_validation(ctx)
-    _update_ctx_modules(ctx)
-    _validate_ctx_modules(ctx)
-    diagnostics.publish_workspace_diagnostics(ls)
+    _clear_ctx_validation(wfc.ctx)
+    _update_ctx_modules(wfc.ctx)
+    _validate_ctx_modules(wfc.ctx)
+    diagnostics.publish_workspace_folder_diagnostics(wfc)
 
 
 # pyang supports LSP `TextDocumentSyncKind` `Full` but not `Incremental`
@@ -361,16 +363,15 @@ def text_document_did_change(
     wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
     if not wfc:
         return
-    ctx = wfc.ctx
 
-    _clear_ctx_validation(ctx)
+    _clear_ctx_validation(wfc.ctx)
 
     for content_change in params.content_changes:
         ls.workspace.update_text_document(params.text_document, content_change)
 
-    _update_ctx_modules(ctx)
-    _validate_ctx_modules(ctx)
-    diagnostics.publish_workspace_diagnostics(ls)
+    _update_ctx_modules(wfc.ctx)
+    _validate_ctx_modules(wfc.ctx)
+    diagnostics.publish_workspace_folder_diagnostics(wfc)
 
 
 @pyangls.feature(lsp.TEXT_DOCUMENT_DID_CLOSE)
@@ -383,7 +384,6 @@ def text_document_did_close(
     wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
     if not wfc:
         return
-    ctx = wfc.ctx
 
     text_doc = ls.workspace.get_text_document(params.text_document.uri)
     orig_source = text_doc._source
@@ -401,10 +401,10 @@ def text_document_did_close(
     # textDocument/didChange notification before textDocument/didClose for the
     # case when an edited buffer window is killed without saving so that the
     # project diagnostics are still consistent
-    _clear_ctx_validation(ctx)
-    _update_ctx_modules(ctx)
-    _validate_ctx_modules(ctx)
-    diagnostics.publish_workspace_diagnostics(ls)
+    _clear_ctx_validation(wfc.ctx)
+    _update_ctx_modules(wfc.ctx)
+    _validate_ctx_modules(wfc.ctx)
+    diagnostics.publish_workspace_folder_diagnostics(wfc)
 
 
 ################################################################################
@@ -456,8 +456,7 @@ def workspace_did_change_configuration(
     for wfc in ls.wfc.values():
         _update_ctx_modules(wfc.ctx)
         _validate_ctx_modules(wfc.ctx)
-    # TODO: Change API to be per worspace folder
-    diagnostics.publish_workspace_diagnostics(ls)
+        diagnostics.publish_workspace_folder_diagnostics(wfc)
 
 
 @pyangls.feature(lsp.WORKSPACE_DID_CHANGE_WATCHED_FILES)
@@ -471,8 +470,7 @@ def workspace_did_change_watched_files(
     wfc = common.get_workspace_folder_context(ls, params.changes[0].uri)
     if not wfc:
         return
-    ctx = wfc.ctx
-    _clear_ctx_validation(ctx)
+    _clear_ctx_validation(wfc.ctx)
 
     # Process all the Deleted events first to handle renames gracefully
     for event in params.changes:
@@ -481,8 +479,8 @@ def workspace_did_change_watched_files(
 
         text_doc = ls.workspace.get_text_document(event.uri)
         ls.workspace.remove_text_document(text_doc.uri)
-        _delete_from_ctx(ctx, text_doc)
-        diagnostics.publish_document_diagnostics(ls, text_doc, [])
+        _delete_from_ctx(wfc.ctx, text_doc)
+        diagnostics.publish_document_diagnostics(wfc, text_doc, [])
 
     for event in params.changes:
         if event.type == lsp.FileChangeType.Created:
@@ -503,9 +501,9 @@ def workspace_did_change_watched_files(
             text_doc = ls.workspace.get_text_document(event.uri)
             text_doc._source = None
 
-    _update_ctx_modules(ctx)
-    _validate_ctx_modules(ctx)
-    diagnostics.publish_workspace_diagnostics(ls)
+    _update_ctx_modules(wfc.ctx)
+    _validate_ctx_modules(wfc.ctx)
+    diagnostics.publish_workspace_folder_diagnostics(wfc)
 
 
 ################################################################################

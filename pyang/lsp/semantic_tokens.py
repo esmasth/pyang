@@ -243,7 +243,7 @@ def text_document_semantic_tokens_full(
     if not module:
         return None
 
-    tokens = stmt_tokens(ls.ctx, module)[0] # type: ignore
+    tokens = stmt_tokens(wfc.ctx, module)[0] # type: ignore
 
     data = []
     for token in tokens:

@@ -259,12 +259,12 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
     proj_dir = os.path.abspath(o.proj_dir)
 
     if o.verbose:
+        sys.stderr.write(f"# pyang version: {pyang.__version__}\n")
         sys.stderr.write(f"# current directory: {os.path.abspath(os.path.curdir)}\n")
         if os.path.exists(user_cfg_path) and os.path.isfile(user_cfg_path):
             sys.stderr.write(f"# user config: {user_cfg_path}\n")
             sys.stderr.write(json.dumps(user_cfg, indent=4) + '\n')
         sys.stderr.write(f"# cli arguments: {str(sys.argv)}\n")
-        sys.stderr.write(f"# project directory: {proj_dir}\n")
 
     if o.lsp:
         try:
@@ -276,6 +276,9 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
             sys.exit(1)
         pyangls.start_server(o)
         sys.exit(0)
+
+    if o.verbose:
+        sys.stderr.write(f"# project directory: {proj_dir}\n")
 
     if o.outfile is not None and o.format is None and o.lsp is None:
         sys.stderr.write("no format specified\n")
@@ -297,120 +300,6 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
         else:
             fd = sys.stdin.buffer
         hel = hello.HelloParser().parse(fd)
-
-    # if o.config:
-    #     config_path = os.path.abspath(o.config)
-    # else:
-    #     config_path = os.path.join(proj_dir, '.pyang.json')
-    # path = ''
-    # ignore_path = ''
-    # cfg_paths: List[str] = []
-    # cfg_ignore_paths = []
-    # cfg = None
-    # if os.path.exists(config_path) and os.path.isfile(config_path):
-    #     if o.verbose:
-    #         sys.stderr.write(f"# project config: {os.path.abspath(config_path)}\n")
-    #     with open(config_path, 'r', encoding='utf-8') as config_file:
-    #         cfg = json.load(config_file)
-    #         if o.verbose:
-    #             sys.stderr.write(json.dumps(cfg, indent=4) + '\n')
-    #         try:
-    #             cfg_paths = cfg["search"]["paths"]
-    #             cfg_ignore_paths = cfg["search"]["ignorePaths"]
-    #         except KeyError:
-    #             pass
-
-    # path = ''
-    # for cfg_path in cfg_paths:
-    #     if not os.path.isabs(cfg_path):
-    #         cfg_path = os.path.join(proj_dir, cfg_path)
-    #     if path:
-    #         path = os.pathsep.join([path, cfg_path])
-    #     else:
-    #         path = cfg_path
-    # # path = o.path
-
-    # default_dirs = "."
-    # if o.proj_dir != ".":
-    #     default_dirs += os.pathsep + "."
-    # # add standard search path
-    # if len(o.path) == 0:
-    #     path = default_dirs
-    # else:
-    #     path += os.pathsep + default_dirs
-
-    # ignore_path = ''
-    # for cfg_ignore_path in cfg_ignore_paths:
-    #     if not os.path.isabs(cfg_ignore_path):
-    #         cfg_ignore_path = os.path.join(proj_dir, cfg_ignore_path)
-    #     if ignore_path:
-    #         ignore_path = os.pathsep.join([ignore_path, cfg_ignore_path])
-    #     else:
-    #         ignore_path = cfg_ignore_path
-    # # ignore_path = o.ignore_path
-
-    # no_path_recurse = False
-    # if o.no_path_recurse:
-    #     no_path_recurse = o.no_path_recurse
-    # elif cfg:
-    #     try:
-    #         no_path_recurse = not cfg["search"]["pathRecurse"]
-    #     except KeyError:
-    #         pass
-
-    # use_env = True
-    # if o.no_env_path is not None:
-    #     use_env = not o.no_env_path
-    # elif cfg:
-    #     try:
-    #         use_env = cfg["search"]["useDefaults"]
-    #     except KeyError:
-    #         pass
-
-    # repos = repository.FileRepository(path=path,
-    #                                   use_env=use_env,
-    #                                   no_path_recurse=no_path_recurse,
-    #                                   ignore_path=ignore_path,
-    #                                   verbose=o.verbose)
-
-    # ctx = context.Context(repos)
-
-    # ctx.opts = o
-    # ctx.cfg = cfg
-
-    # if o.canonical is not None:
-    #     ctx.canonical = o.canonical
-    # elif cfg:
-    #     try:
-    #         ctx.canonical = cfg["lint"]["canonical"]
-    #     except KeyError:
-    #         pass
-
-    # if o.max_line_len is not None:
-    #     ctx.max_line_len = o.max_line_len
-    # elif cfg:
-    #     try:
-    #         if cfg["lint"]["longLine"]:
-    #             ctx.max_line_len = cfg["lint"]["longLine"]["length"]
-    #     except KeyError:
-    #         pass
-
-    # if o.max_identifier_len is not None:
-    #     ctx.max_identifier_len = o.max_identifier_len
-    # elif cfg:
-    #     try:
-    #         if cfg["lint"]["longIdentifier"]:
-    #             ctx.max_identifier_len = cfg["lint"]["longIdentifier"]["length"]
-    #     except KeyError:
-    #         pass
-
-    # if o.strict is not None:
-    #     ctx.strict = o.strict
-    # elif cfg:
-    #     try:
-    #         ctx.strict = cfg["lint"]["strict"]
-    #     except KeyError:
-    #         pass
 
     wsf = workspace.WorkspaceFolderContext(name='cli', path=proj_dir, opts=o)
     ctx = wsf.ctx

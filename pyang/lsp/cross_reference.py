@@ -61,7 +61,7 @@ def text_document_references(
         return None
     match glue.stmt_from_lsp_position(module, params.position):
         case (stmt, 'arg'):
-            ref_stmts = common.find_stmt_references(ls.ctx, stmt) # type: ignore
+            ref_stmts = common.find_stmt_references(wfc.ctx, stmt)
             match stmt.keyword:
                 case 'path' | 'augment' | 'deviation':
                     pass
@@ -79,6 +79,11 @@ def text_document_definition(
     params: lsp.ReferenceParams,
 ) -> Union[lsp.Definition, List[lsp.DefinitionLink], None]:
     """Handles LSP `textDocument/definition` request."""
+
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return None
+
     module = ls.modules[params.text_document.uri] # type: ignore
     if not module:
         return None
@@ -101,7 +106,7 @@ def text_document_definition(
                 return [definition_link]
             except (KeyError, AttributeError):
                 pass
-            ref_stmt = common.ext_stmt_from_stmt_kwd(ls.ctx, stmt) # type: ignore
+            ref_stmt = common.ext_stmt_from_stmt_kwd(wfc.ctx, stmt)
             if not ref_stmt:
                 return None
             for uri, module in ls.modules.items(): # type: ignore
@@ -146,7 +151,7 @@ def text_document_definition(
                             definition_uri = uri
                             break
                 case 'uses' | 'if-feature' | 'type' | 'base':
-                    ref_stmt = common.referenced_stmt_from_stmt_arg(ls.ctx, stmt) # type: ignore
+                    ref_stmt = common.referenced_stmt_from_stmt_arg(wfc.ctx, stmt)
                     if not ref_stmt:
                         return None
                     for uri, module in ls.modules.items(): # type: ignore
@@ -158,7 +163,7 @@ def text_document_definition(
                     r = stmt.search_one('revision-date')
                     if r is not None:
                         revision = r.arg
-                    module = ls.ctx.get_module(stmt.arg, revision) # type: ignore
+                    module = wfc.ctx.get_module(stmt.arg, revision)
                     if module:
                         for uri, module in ls.modules.items(): # type: ignore
                             ref_stmt = module
@@ -277,6 +282,11 @@ def text_document_type_definition(
         not ls.client_capabilities.text_document.type_definition:
         # Incapable client has sent `textDocument/typeDefinition` request
         return None
+
+    wfc = common.get_workspace_folder_context(ls, params.text_document.uri)
+    if not wfc:
+        return None
+
     module = ls.modules[params.text_document.uri] # type: ignore
     if not module:
         return None

@@ -349,7 +349,7 @@ def text_document_completion(
     module: ModSubmodStatement | None = ls.modules[params.text_document.uri] # type: ignore
     if not module:
         return None
-    ctx = ls.ctx # type: ignore
+    ctx = wfc.ctx
     position = params.position
     if params.context:
         trigger_kind = params.context.trigger_kind

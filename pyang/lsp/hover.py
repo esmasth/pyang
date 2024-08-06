@@ -38,7 +38,7 @@ def text_document_hover(
         return current + value
 
     def append_ref_info(current: str, stmt: Statement) -> str:
-        ref_stmt = common.referenced_stmt_from_stmt_arg(ls.ctx, stmt) # type: ignore
+        ref_stmt = common.referenced_stmt_from_stmt_arg(wfc.ctx, stmt)
         if ref_stmt:
             desc = statements.get_description(ref_stmt)
             if desc and desc.strip() != '':
@@ -76,7 +76,7 @@ def text_document_hover(
                         hover_value = append_hover(hover_value, rfcref_value(kwd_rfcref))
                     case _:
                         # not an inbuilt keyword
-                        ext_stmt = common.ext_stmt_from_stmt_kwd(ls.ctx, stmt) # type: ignore
+                        ext_stmt = common.ext_stmt_from_stmt_kwd(wfc.ctx, stmt)
                         if ext_stmt:
                             # extension
                             desc = statements.get_description(ext_stmt)
@@ -140,7 +140,7 @@ def text_document_hover(
                     r = stmt.search_one('revision-date')
                     if r is not None:
                         revision = r.arg
-                    module = ls.ctx.get_module(stmt.arg, revision) # type: ignore
+                    module = wfc.ctx.get_module(stmt.arg, revision)
                     if module:
                         desc = statements.get_description(module)
                         if desc:
