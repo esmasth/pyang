@@ -49,6 +49,7 @@ def _build_doc_diagnostics(
             end_line = epos.arg_eline
             end_col = epos.arg_echar
             if etag == 'LONG_LINE' and wfc.ctx.max_line_len is not None:
+                start_line = epos.line - 1
                 start_col = wfc.ctx.max_line_len
                 end_line = epos.line
                 end_col = 0
