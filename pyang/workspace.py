@@ -7,6 +7,7 @@ import sys
 from typing import Any, List
 
 
+from pyang import plugin
 from pyang.context import Context
 from pyang.repository import FileRepository
 
@@ -146,6 +147,10 @@ class WorkspaceFolderContext:
                 self.ctx.strict = cfg["lint"]["strict"]
             except KeyError:
                 pass
+
+        for p in plugin.plugins:
+            p.setup_ctx(self.ctx)
+
 
     def is_ignored(self, doc_uri: str) -> bool:
         if 'validation' in doc_uri or 'visualization' in doc_uri:
