@@ -23,7 +23,7 @@ from pygls.server import LanguageServer
 
 from pyang import error, grammar
 from pyang.context import Context
-from pyang.lsp import common, types
+from pyang.lsp import common, maps
 from pyang.statements import LeafLeaflistStatement, Statement
 
 from . import glue
@@ -57,7 +57,7 @@ def _stmt_to_lsp_symbol_kind(ctx: Context, stmt: Statement) -> lsp.SymbolKind:
                                 return lsp.SymbolKind.Null
                             return leaf_symbol_kind(ref_stmt) # type: ignore
                         try:
-                            return types.type_map[stmt_type]['symbol']
+                            return maps.type_map[stmt_type]['symbol']
                         except KeyError:
                             return lsp.SymbolKind.Field
 
@@ -65,7 +65,7 @@ def _stmt_to_lsp_symbol_kind(ctx: Context, stmt: Statement) -> lsp.SymbolKind:
 
                 case _:
                     try:
-                        return types.keyword_map[stmt.keyword]['symbol']
+                        return maps.keyword_map[stmt.keyword]['symbol']
                     except KeyError:
                         return lsp.SymbolKind.Null
         case (str(), str()):

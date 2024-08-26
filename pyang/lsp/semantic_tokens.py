@@ -19,48 +19,48 @@ from pyang.context import Context
 from pyang.lsp import common
 from pyang.statements import ModSubmodStatement, Statement
 
-from . import glue, types
+from . import glue, maps
 
 TOKEN_TYPES: List[str] = [
-    types.SemanticTokenType.Namespace,
-    types.SemanticTokenType.Type,
-    types.SemanticTokenType.Class,
-    types.SemanticTokenType.Enum,
-    types.SemanticTokenType.Interface,
-    types.SemanticTokenType.Struct,
-    types.SemanticTokenType.TypeParameter,
-    types.SemanticTokenType.Parameter,
-    types.SemanticTokenType.Variable,
-    types.SemanticTokenType.Property,
-    types.SemanticTokenType.EnumMember,
-    types.SemanticTokenType.Event,
-    types.SemanticTokenType.Function,
-    types.SemanticTokenType.Method,
-    types.SemanticTokenType.Macro,
-    types.SemanticTokenType.Keyword,
-    types.SemanticTokenType.Modifier,
-    types.SemanticTokenType.Comment,
-    types.SemanticTokenType.String,
-    types.SemanticTokenType.Number,
-    types.SemanticTokenType.RegExp,
-    types.SemanticTokenType.Operator,
-    types.SemanticTokenType.Decorator,
+    lsp.SemanticTokenTypes.Namespace,
+    lsp.SemanticTokenTypes.Type,
+    lsp.SemanticTokenTypes.Class,
+    lsp.SemanticTokenTypes.Enum,
+    lsp.SemanticTokenTypes.Interface,
+    lsp.SemanticTokenTypes.Struct,
+    lsp.SemanticTokenTypes.TypeParameter,
+    lsp.SemanticTokenTypes.Parameter,
+    lsp.SemanticTokenTypes.Variable,
+    lsp.SemanticTokenTypes.Property,
+    lsp.SemanticTokenTypes.EnumMember,
+    lsp.SemanticTokenTypes.Event,
+    lsp.SemanticTokenTypes.Function,
+    lsp.SemanticTokenTypes.Method,
+    lsp.SemanticTokenTypes.Macro,
+    lsp.SemanticTokenTypes.Keyword,
+    lsp.SemanticTokenTypes.Modifier,
+    lsp.SemanticTokenTypes.Comment,
+    lsp.SemanticTokenTypes.String,
+    lsp.SemanticTokenTypes.Number,
+    lsp.SemanticTokenTypes.Regexp,
+    lsp.SemanticTokenTypes.Operator,
+    lsp.SemanticTokenTypes.Decorator,
 ]
 """`SemanticTokensLegend.tokenTypes`
 
 https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokensLegend"""
 
 TOKEN_MODIFIERS: List[str] = [
-    types.SemanticTokenModifier.Declaration,
-    types.SemanticTokenModifier.Definition,
-    types.SemanticTokenModifier.ReadOnly,
-    types.SemanticTokenModifier.Static,
-    types.SemanticTokenModifier.Deprecated,
-    types.SemanticTokenModifier.Abstract,
-    types.SemanticTokenModifier.Async,
-    types.SemanticTokenModifier.Modification,
-    types.SemanticTokenModifier.Documentation,
-    types.SemanticTokenModifier.DefaultLibrary,
+    lsp.SemanticTokenModifiers.Declaration,
+    lsp.SemanticTokenModifiers.Definition,
+    lsp.SemanticTokenModifiers.Readonly,
+    lsp.SemanticTokenModifiers.Static,
+    lsp.SemanticTokenModifiers.Deprecated,
+    lsp.SemanticTokenModifiers.Abstract,
+    lsp.SemanticTokenModifiers.Async,
+    lsp.SemanticTokenModifiers.Modification,
+    lsp.SemanticTokenModifiers.Documentation,
+    lsp.SemanticTokenModifiers.DefaultLibrary,
 ]
 """`SemanticTokensLegend.tokenModifiers`
 
@@ -93,8 +93,8 @@ def delta_linechar(
 def stmt_type_token_idx(ctx: Context, stmt: Statement) -> int:
     base_type = common.get_base_type(ctx, stmt)
     if base_type:
-        return TOKEN_TYPES.index(types.type_map[base_type]['semantic'])
-    return TOKEN_TYPES.index(types.SemanticTokenType.Type)
+        return TOKEN_TYPES.index(maps.type_map[base_type]['semantic'])
+    return TOKEN_TYPES.index(lsp.SemanticTokenTypes.Type)
 
 def arg_token_idx(ctx: Context, stmt: Statement) -> int | None:
     match stmt.keyword:
@@ -102,41 +102,66 @@ def arg_token_idx(ctx: Context, stmt: Statement) -> int | None:
             return stmt_type_token_idx(ctx, stmt.parent)
         case _:
             try:
-                token_type = types.keyword_map[stmt.keyword]['semantic']
+                token_type = maps.keyword_map[stmt.keyword]['semantic']
             except KeyError:
-                match grammar.stmt_map[stmt.keyword][0]:
-                    case 'identifier':
-                        token_type = types.SemanticTokenType.Type
-                    case 'string':
-                        token_type = types.SemanticTokenType.String
-                    case 'non-negative-integer':
-                        token_type = types.SemanticTokenType.Number
-                    case _:
-                        token_type = types.SemanticTokenType.Type
+                try:
+                    match grammar.stmt_map[stmt.keyword][0]:
+                        case 'identifier':
+                            token_type = lsp.SemanticTokenTypes.Type
+                        case 'string':
+                            token_type = lsp.SemanticTokenTypes.String
+                        case 'non-negative-integer':
+                            token_type = lsp.SemanticTokenTypes.Number
+                        case _:
+                            token_type = lsp.SemanticTokenTypes.Type
+                except KeyError:
+                    token_type = lsp.SemanticTokenTypes.Type
             return TOKEN_TYPES.index(token_type)
 
 def arg_tok_mods(stmt: Statement) -> int:
     tok_mods = 0
+    def _set_tok_mod(mod: str) -> None:
+        nonlocal tok_mods
+        tok_mods |= 1 << TOKEN_MODIFIERS.index(mod)
+    def _is_child_of_augment_deviation_refine(stmt: Statement) -> bool:
+        parent = stmt.parent
+        while parent is not None:
+            if parent.keyword in ['augment', 'deviate', 'refine']:
+                return True
+            parent = parent.parent
+        return False
     match stmt.keyword:
+        case 'module':
+            _set_tok_mod(lsp.SemanticTokenModifiers.Definition)
+        case 'submodule':
+            _set_tok_mod(lsp.SemanticTokenModifiers.Definition)
         case 'description':
-            tok_mods |= TOKEN_MODIFIERS.index(types.SemanticTokenModifier.Documentation)
+            _set_tok_mod(lsp.SemanticTokenModifiers.Documentation)
         case 'reference':
-            tok_mods |= TOKEN_MODIFIERS.index(types.SemanticTokenModifier.Documentation)
+            _set_tok_mod(lsp.SemanticTokenModifiers.Documentation)
+        case 'organization':
+            _set_tok_mod(lsp.SemanticTokenModifiers.Documentation)
+        case 'contact':
+            _set_tok_mod(lsp.SemanticTokenModifiers.Documentation)
         case 'presence':
-            tok_mods |= TOKEN_MODIFIERS.index(types.SemanticTokenModifier.Documentation)
+            _set_tok_mod(lsp.SemanticTokenModifiers.Documentation)
+        case 'error-message':
+            _set_tok_mod(lsp.SemanticTokenModifiers.Documentation)
         case 'typedef':
-            tok_mods |= TOKEN_MODIFIERS.index(types.SemanticTokenModifier.Definition)
+            _set_tok_mod(lsp.SemanticTokenModifiers.Definition)
         case 'identity':
-            tok_mods |= TOKEN_MODIFIERS.index(types.SemanticTokenModifier.Definition)
+            _set_tok_mod(lsp.SemanticTokenModifiers.Definition)
         case 'extension':
-            tok_mods |= TOKEN_MODIFIERS.index(types.SemanticTokenModifier.Definition)
+            _set_tok_mod(lsp.SemanticTokenModifiers.Definition)
         case _:
             pass
+    if _is_child_of_augment_deviation_refine(stmt):
+        _set_tok_mod(lsp.SemanticTokenModifiers.Modification)
     if hasattr(stmt, 'i_config') and not stmt.i_config:
-        tok_mods |= TOKEN_MODIFIERS.index('readonly')
+        _set_tok_mod(lsp.SemanticTokenModifiers.Readonly)
     if (status := stmt.search_one('status')) and \
             status.arg in ['deprecated', 'obsolete']:
-        tok_mods |= TOKEN_MODIFIERS.index('deprecated')
+        _set_tok_mod(lsp.SemanticTokenModifiers.Deprecated)
     return tok_mods
 
 def arg_tokens(
@@ -167,7 +192,7 @@ def stmt_tokens(
     length = echar - schar
     tok_mods = 0
     if not util.is_prefixed(stmt.keyword):
-        tok_type = TOKEN_TYPES.index(types.SemanticTokenType.Keyword)
+        tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Keyword)
         tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
     else:
         module, keyword = stmt.keyword
@@ -178,21 +203,21 @@ def stmt_tokens(
         if prefix:
             # prefix
             length = len(prefix)
-            tok_type = TOKEN_TYPES.index(types.SemanticTokenType.Namespace)
+            tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Namespace)
             tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
             # :
             delta_line = 0
             delta_char = length
             schar += length
             length = 1
-            tok_type = TOKEN_TYPES.index(types.SemanticTokenType.Operator)
+            tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Operator)
             tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
             # keyword
             delta_line = 0
             delta_char = length
             schar += length
             length = len(keyword)
-            tok_type = TOKEN_TYPES.index(types.SemanticTokenType.Keyword)
+            tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Keyword)
             tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
     prev_line = sline
     prev_char = schar
@@ -213,7 +238,7 @@ def stmt_tokens(
             length = 666
         tok_type = arg_token_idx(ctx, stmt)
         if not tok_type:
-            tok_type = TOKEN_TYPES.index(types.SemanticTokenType.Type)
+            tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Type)
         tok_mods = arg_tok_mods(stmt)
         tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
         prev_line = sline

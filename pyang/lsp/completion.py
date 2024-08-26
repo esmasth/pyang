@@ -25,8 +25,7 @@ from pyang.statements import (
 )
 from pyang.translators import yang
 
-from . import glue, rfc
-from . import types as lstypes
+from . import glue, maps, rfc
 
 INDENT_STEP = 2
 
@@ -421,7 +420,7 @@ def text_document_completion(
                                     edit_range=lsp.Range(start=position, end=position),
                                     edit_new_text='deviate not-supported;',
                                     text_format=lsp.InsertTextFormat.PlainText,
-                                    kind=lstypes.keyword_map[stmt.keyword]['completion']
+                                    kind=maps.keyword_map[stmt.keyword]['completion']
                                 )
                             )
                             continue
@@ -578,7 +577,7 @@ def text_document_completion(
                                 edit_range=edit_range,
                                 edit_new_text=type_spec,
                                 sort_idx=sort_idx,
-                                kind=lstypes.type_map[type_spec]['completion'],
+                                kind=maps.type_map[type_spec]['completion'],
                                 text_format=lsp.InsertTextFormat.PlainText,
                             )
                         )
