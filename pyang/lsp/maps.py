@@ -213,336 +213,478 @@ keyword_map = {
         'symbol'    : lsp.SymbolKind.Module,
         'completion': lsp.CompletionItemKind.Module,
         'semantic'  : lsp.SemanticTokenTypes.Namespace,
+        'modifiers' : [
+            lsp.SemanticTokenModifiers.Definition,
+        ],
     },
     'submodule': {
         'symbol'    : lsp.SymbolKind.Module,
         'completion': lsp.CompletionItemKind.Module,
         'semantic'  : lsp.SemanticTokenTypes.Namespace,
+        'modifiers' : [
+            lsp.SemanticTokenModifiers.Definition,
+        ],
     },
     'yang-version': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'revision': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'contact': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.String,
+        'modifiers' : [
+            lsp.SemanticTokenModifiers.Documentation,
+        ],
     },
     'organization': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.String,
+        'modifiers' : [
+            lsp.SemanticTokenModifiers.Documentation,
+        ],
     },
     'description': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.String,
+        'modifiers' : [
+            lsp.SemanticTokenModifiers.Documentation,
+        ],
     },
     'reference': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.String,
+        'modifiers' : [
+            lsp.SemanticTokenModifiers.Documentation,
+        ],
     },
     'namespace': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'prefix': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Namespace,
+        'modifiers' : [
+        ],
     },
     'feature': {
         'symbol'    : lsp.SymbolKind.Boolean,
         'completion': lsp.CompletionItemKind.Constant,
         'semantic'  : lsp.SemanticTokenTypes.Interface,
+        'modifiers' : [
+        ],
     },
     'if-feature': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Operator,
         'semantic'  : lsp.SemanticTokenTypes.Interface,
+        'modifiers' : [
+        ],
     },
     'when': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Operator,
-        'semantic'  : lsp.SemanticTokenTypes.Operator,
+        'semantic'  : lsp.SemanticTokenTypes.Decorator,
+        'modifiers' : [
+        ],
     },
     'must': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Operator,
-        'semantic'  : lsp.SemanticTokenTypes.Operator,
+        'semantic'  : lsp.SemanticTokenTypes.Decorator,
+        'modifiers' : [
+        ],
     },
     'choice': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Operator,
         'semantic'  : lsp.SemanticTokenTypes.Decorator,
+        'modifiers' : [
+        ],
     },
     'case': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Operator,
         'semantic'  : lsp.SemanticTokenTypes.Decorator,
+        'modifiers' : [
+        ],
     },
     'grouping': {
         'symbol'    : lsp.SymbolKind.Struct,
         'completion': lsp.CompletionItemKind.Struct,
         'semantic'  : lsp.SemanticTokenTypes.Macro,
+        'modifiers' : [
+        ],
     },
     'extension': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Operator,
         'semantic'  : lsp.SemanticTokenTypes.Keyword,
+        'modifiers' : [
+        ],
     },
     'key': {
         'symbol'    : lsp.SymbolKind.Key,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'pattern': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Regexp,
+        'modifiers' : [
+        ],
     },
     'fraction-digits': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Number,
+        'modifiers' : [
+        ],
     },
     'identity': {
         'symbol'    : lsp.SymbolKind.Class,
         'completion': lsp.CompletionItemKind.Class,
         'semantic'  : lsp.SemanticTokenTypes.Class,
+        'modifiers' : [
+        ],
     },
     'base': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Class,
+        'modifiers' : [
+        ],
     },
     'typedef': {
         'symbol'    : lsp.SymbolKind.TypeParameter,
         'completion': lsp.CompletionItemKind.TypeParameter,
-        'semantic'  : lsp.SemanticTokenTypes.Class,
+        'semantic'  : lsp.SemanticTokenTypes.Type,
+        'modifiers' : [
+        ],
     },
     'type': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
-        'semantic'  : lsp.SemanticTokenTypes.Class,
+        'semantic'  : lsp.SemanticTokenTypes.Type,
+        'modifiers' : [
+        ],
     },
     'container': {
         'symbol'    : lsp.SymbolKind.Class,
         'completion': lsp.CompletionItemKind.Class,
         'semantic'  : lsp.SemanticTokenTypes.Class,
+        'modifiers' : [
+        ],
     },
     'list': {
         'symbol'    : lsp.SymbolKind.Array,
         'completion': lsp.CompletionItemKind.Class,
-        'semantic'  : lsp.SemanticTokenTypes.Variable,
+        'semantic'  : lsp.SemanticTokenTypes.Class,
+        'modifiers' : [
+        ],
     },
     'leaf': {
         'symbol'    : lsp.SymbolKind.Variable,
         'completion': lsp.CompletionItemKind.Field,
         'semantic'  : lsp.SemanticTokenTypes.Variable,
+        'modifiers' : [
+        ],
     },
     'leaf-list': {
         'symbol'    : lsp.SymbolKind.Array,
         'completion': lsp.CompletionItemKind.Field,
         'semantic'  : lsp.SemanticTokenTypes.Variable,
+        'modifiers' : [
+        ],
     },
     'rpc': {
         'symbol'    : lsp.SymbolKind.Function,
         'completion': lsp.CompletionItemKind.Function,
         'semantic'  : lsp.SemanticTokenTypes.Function,
+        'modifiers' : [
+        ],
     },
     'action': {
         'symbol'    : lsp.SymbolKind.Function,
         'completion': lsp.CompletionItemKind.Function,
         'semantic'  : lsp.SemanticTokenTypes.Function,
+        'modifiers' : [
+        ],
     },
     'input': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Operator,
         'semantic'  : lsp.SemanticTokenTypes.Operator,
+        'modifiers' : [
+        ],
     },
     'output': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Operator,
         'semantic'  : lsp.SemanticTokenTypes.Operator,
+        'modifiers' : [
+        ],
     },
     'notification': {
         'symbol'    : lsp.SymbolKind.Event,
         'completion': lsp.CompletionItemKind.Event,
         'semantic'  : lsp.SemanticTokenTypes.Event,
+        'modifiers' : [
+            lsp.SemanticTokenModifiers.Async,
+        ],
     },
     'enum': {
         'symbol'    : lsp.SymbolKind.EnumMember,
         'completion': lsp.CompletionItemKind.EnumMember,
         'semantic'  : lsp.SemanticTokenTypes.EnumMember,
+        'modifiers' : [
+        ],
     },
     'error-message': {
         'symbol'    : lsp.SymbolKind.EnumMember,
         'completion': lsp.CompletionItemKind.EnumMember,
         'semantic'  : lsp.SemanticTokenTypes.String,
+        'modifiers' : [
+        ],
     },
     'presence': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.TypeParameter,
-        'semantic'  : lsp.SemanticTokenTypes.TypeParameter,
+        'semantic'  : lsp.SemanticTokenTypes.String,
+        'modifiers' : [
+        ],
     },
     'value': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Number,
+        'modifiers' : [
+        ],
     },
     'bit': {
         'symbol'    : lsp.SymbolKind.EnumMember,
         'completion': lsp.CompletionItemKind.EnumMember,
         'semantic'  : lsp.SemanticTokenTypes.EnumMember,
+        'modifiers' : [
+        ],
     },
     'position': {
         'symbol'    : lsp.SymbolKind.EnumMember,
         'completion': lsp.CompletionItemKind.EnumMember,
         'semantic'  : lsp.SemanticTokenTypes.Number,
+        'modifiers' : [
+        ],
     },
     'anyxml': {
         'symbol'    : lsp.SymbolKind.Variable,
         'completion': lsp.CompletionItemKind.Variable,
         'semantic'  : lsp.SemanticTokenTypes.String,
+        'modifiers' : [
+        ],
     },
     'anydata': {
         'symbol'    : lsp.SymbolKind.Variable,
         'completion': lsp.CompletionItemKind.Variable,
         'semantic'  : lsp.SemanticTokenTypes.Variable,
+        'modifiers' : [
+        ],
     },
     'augment': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Operator,
-        'semantic'  : lsp.SemanticTokenTypes.Modifier,
+        'semantic'  : lsp.SemanticTokenTypes.Class,
+        'modifiers' : [
+        ],
     },
     'deviation': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Operator,
         'semantic'  : lsp.SemanticTokenTypes.Modifier,
+        'modifiers' : [
+        ],
     },
     'deviate': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Snippet,
         'semantic'  : lsp.SemanticTokenTypes.Modifier,
+        'modifiers' : [
+        ],
     },
     'refine': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Snippet,
         'semantic'  : lsp.SemanticTokenTypes.Class,
+        'modifiers' : [
+        ],
     },
     'config': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.EnumMember,
+        'modifiers' : [
+        ],
     },
     'units': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'path': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'length': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'range': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'modifier': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Modifier,
+        'modifiers' : [
+        ],
     },
     'mandatory': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'max-elements': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Number,
+        'modifiers' : [
+        ],
     },
     'min-elements': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Number,
+        'modifiers' : [
+        ],
     },
     'default': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'uses': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Operator,
         'semantic'  : lsp.SemanticTokenTypes.Macro,
+        'modifiers' : [
+        ],
     },
     'argument': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'status': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.EnumMember,
+        'modifiers' : [
+        ],
     },
     'ordered-by': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
-        'semantic'  : lsp.SemanticTokenTypes.Property,
+        'semantic'  : lsp.SemanticTokenTypes.EnumMember,
+        'modifiers' : [
+        ],
     },
     'import': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Reference,
         'semantic'  : lsp.SemanticTokenTypes.Namespace,
+        'modifiers' : [
+        ],
     },
     'include': {
         'symbol'    : lsp.SymbolKind.Operator,
         'completion': lsp.CompletionItemKind.Reference,
         'semantic'  : lsp.SemanticTokenTypes.Namespace,
+        'modifiers' : [
+        ],
     },
     'revision-date': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Reference,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'require-instance': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     'yin-element': {
         'symbol'    : lsp.SymbolKind.Boolean,
         'completion': lsp.CompletionItemKind.Text,
         'semantic'  : lsp.SemanticTokenTypes.EnumMember,
+        'modifiers' : [
+        ],
     },
     'unique': {
         'symbol'    : lsp.SymbolKind.Key,
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
+        'modifiers' : [
+        ],
     },
     '_comment': {
         'symbol'    : lsp.SymbolKind.Null,
         'completion': lsp.CompletionItemKind.Text,
         'semantic'  : lsp.SemanticTokenTypes.Comment,
+        'modifiers' : [
+            lsp.SemanticTokenModifiers.Documentation
+        ],
     },
 }
 """YANG `keyword` mapping to LSP
@@ -552,4 +694,6 @@ Following property keys are present
 * `completion`: LSP `CompletionItemKind` for keyword
 * `semantic`  : LSP `SemanticTokenType` for argument
 * `modifiers` : LSP `SemanticTokenModifiers` for argument
+
+https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide#standard-token-types-and-modifiers
 """

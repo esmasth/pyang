@@ -55,7 +55,7 @@ def _build_doc_diagnostics(
                 end_col = 0
             elif etag == 'LONG_IDENTIFIER' and wfc.ctx.max_identifier_len is not None:
                 start_col = epos.arg_schar + wfc.ctx.max_identifier_len
-            elif 'KEYWORD' in etag:
+            elif 'KEYWORD' in etag or epos.arg_sline < epos.stmt_sline:
                 start_line = epos.kwd_sline
                 start_col = epos.kwd_schar
                 end_line = epos.kwd_eline

@@ -9,6 +9,7 @@ TODO:
 https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens
 """
 
+import re
 from typing import List, Tuple, Union
 
 from lsprotocol import types as lsp
@@ -18,6 +19,7 @@ from pyang import grammar, util
 from pyang.context import Context
 from pyang.lsp import common
 from pyang.statements import ModSubmodStatement, Statement
+from pyang.types import yang_type_specs
 
 from . import glue, maps
 
@@ -96,7 +98,7 @@ def stmt_type_token_idx(ctx: Context, stmt: Statement) -> int:
         return TOKEN_TYPES.index(maps.type_map[base_type]['semantic'])
     return TOKEN_TYPES.index(lsp.SemanticTokenTypes.Type)
 
-def arg_token_idx(ctx: Context, stmt: Statement) -> int | None:
+def arg_token_idx(ctx: Context, stmt: Statement) -> int:
     match stmt.keyword:
         case 'default':
             return stmt_type_token_idx(ctx, stmt.parent)
@@ -105,24 +107,21 @@ def arg_token_idx(ctx: Context, stmt: Statement) -> int | None:
                 token_type = maps.keyword_map[stmt.keyword]['semantic']
             except KeyError:
                 try:
-                    match grammar.stmt_map[stmt.keyword][0]:
-                        case 'identifier':
-                            token_type = lsp.SemanticTokenTypes.Type
-                        case 'string':
-                            token_type = lsp.SemanticTokenTypes.String
-                        case 'non-negative-integer':
-                            token_type = lsp.SemanticTokenTypes.Number
-                        case _:
-                            token_type = lsp.SemanticTokenTypes.Type
+                    arg_type = grammar.stmt_map[stmt.keyword][0]
+                    token_type = maps.arg_type_map[arg_type]['semantic']
                 except KeyError:
                     token_type = lsp.SemanticTokenTypes.Type
             return TOKEN_TYPES.index(token_type)
+
+def _update_tok_mods(tok_mods: int, mod: str) -> int:
+    tok_mods |= 1 << TOKEN_MODIFIERS.index(mod)
+    return tok_mods
 
 def arg_tok_mods(stmt: Statement) -> int:
     tok_mods = 0
     def _set_tok_mod(mod: str) -> None:
         nonlocal tok_mods
-        tok_mods |= 1 << TOKEN_MODIFIERS.index(mod)
+        tok_mods = _update_tok_mods(tok_mods, mod)
     def _is_child_of_augment_deviation_refine(stmt: Statement) -> bool:
         parent = stmt.parent
         while parent is not None:
@@ -135,6 +134,8 @@ def arg_tok_mods(stmt: Statement) -> int:
             _set_tok_mod(lsp.SemanticTokenModifiers.Definition)
         case 'submodule':
             _set_tok_mod(lsp.SemanticTokenModifiers.Definition)
+        case 'prefix':
+            _set_tok_mod(lsp.SemanticTokenModifiers.Declaration)
         case 'description':
             _set_tok_mod(lsp.SemanticTokenModifiers.Documentation)
         case 'reference':
@@ -151,6 +152,9 @@ def arg_tok_mods(stmt: Statement) -> int:
             _set_tok_mod(lsp.SemanticTokenModifiers.Definition)
         case 'identity':
             _set_tok_mod(lsp.SemanticTokenModifiers.Definition)
+        case 'type':
+            if stmt.arg in yang_type_specs:
+                _set_tok_mod(lsp.SemanticTokenModifiers.DefaultLibrary)
         case 'extension':
             _set_tok_mod(lsp.SemanticTokenModifiers.Definition)
         case _:
@@ -190,9 +194,9 @@ def stmt_tokens(
     echar = sel_range.end.character
     delta_line, delta_char = delta_linechar(sline, schar, last_line, last_char)
     length = echar - schar
-    tok_mods = 0
     if not util.is_prefixed(stmt.keyword):
         tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Keyword)
+        tok_mods = _update_tok_mods(0, lsp.SemanticTokenModifiers.DefaultLibrary)
         tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
     else:
         module, keyword = stmt.keyword
@@ -204,6 +208,7 @@ def stmt_tokens(
             # prefix
             length = len(prefix)
             tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Namespace)
+            tok_mods = 0
             tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
             # :
             delta_line = 0
@@ -211,6 +216,7 @@ def stmt_tokens(
             schar += length
             length = 1
             tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Operator)
+            tok_mods = 0
             tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
             # keyword
             delta_line = 0
@@ -218,6 +224,7 @@ def stmt_tokens(
             schar += length
             length = len(keyword)
             tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Keyword)
+            tok_mods = 0
             tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
     prev_line = sline
     prev_char = schar
@@ -230,17 +237,60 @@ def stmt_tokens(
         eline = sel_range.end.line
         echar = sel_range.end.character
         delta_line, delta_char = delta_linechar(sline, schar, prev_line, prev_char)
+        tok_mods = 0
         if eline == sline:
             # single line argument
             length = echar - schar
+            prefixed_arg_re = re.compile(r'(^[a-zA-Z0-9-_]+):([a-zA-Z0-9-_]+)$')
+            m = prefixed_arg_re.match(stmt.arg)
+            if not m:
+                tok_type = arg_token_idx(ctx, stmt)
+                tok_mods = arg_tok_mods(stmt)
+                # XXX: presuming strings split by + are never on single line
+                substring = stmt.arg_substrings[0] # type: ignore
+                if substring[1] != '':
+                    length = length - 2
+                    delta_char += 1
+                tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+            elif stmt.keyword == 'type':
+                # prefix
+                prefix = m.group(1)
+                arg = m.group(2)
+                length = len(prefix)
+                tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Namespace)
+                tok_mods = 0
+                tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+                # :
+                delta_line = 0
+                delta_char = length
+                schar += length
+                length = 1
+                tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Operator)
+                tok_mods = 0
+                tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+                # arg
+                delta_line = 0
+                delta_char = length
+                schar += length
+                length = len(arg)
+                tok_type = arg_token_idx(ctx, stmt)
+                tok_mods = arg_tok_mods(stmt)
+                tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
         else:
-            # FIXME: Set length for first line add more tokens for multiline
-            length = 666
-        tok_type = arg_token_idx(ctx, stmt)
-        if not tok_type:
-            tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Type)
-        tok_mods = arg_tok_mods(stmt)
-        tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+            # multi line argument
+            tok_type = arg_token_idx(ctx, stmt)
+            tok_mods = arg_tok_mods(stmt)
+            # XXX: presuming strings split by + or \n are always aligned
+            delta_char += 1
+            for arg_substr in stmt.arg_substrings: # type: ignore
+                arg_toks = arg_substr[0].split('\n')
+                for arg_tok in arg_toks:
+                    tokens.append((delta_line, delta_char, len(arg_tok), tok_type, tok_mods))
+                    delta_line = 1
+                    sline += 1
+                    delta_char = schar + 1
+            delta_line = 0
+            sline -= 1
         prev_line = sline
         prev_char = schar
 

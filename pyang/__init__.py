@@ -1,4 +1,4 @@
 """The pyang library for parsing, validating, and converting YANG modules"""
 
-__version__ = '2.6.2.dev14+esmasth'
-__date__ = '2024-08-09'
+__version__ = '2.6.2.dev15+esmasth'
+__date__ = '2024-09-08'

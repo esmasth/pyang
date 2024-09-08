@@ -113,6 +113,7 @@ class WorkspaceFolderContext:
 
         self.ctx.opts = o # type: ignore
         self.ctx.cfg = cfg # type: ignore
+        self.ctx.keep_arg_substrings = True
 
         if o.canonical is not None:
             self.ctx.canonical = o.canonical

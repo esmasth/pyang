@@ -124,7 +124,9 @@ def referenced_stmt_from_stmt_arg(
 def get_referencing_stmts(
     stmt: Statement,
 ) -> List[Statement]:
-    return stmt.i_referencing_nodes
+    if hasattr(stmt, 'i_referencing_nodes'):
+        return stmt.i_referencing_nodes
+    return []
 
 def get_augmented_stmt(
     augment: AugmentStatement,

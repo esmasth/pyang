@@ -165,8 +165,11 @@ def text_document_definition(
                         revision = r.arg
                     module = wfc.ctx.get_module(stmt.arg, revision)
                     if module:
-                        for uri, module in ls.modules.items(): # type: ignore
-                            ref_stmt = module
+                        for uri, mod in ls.modules.items(): # type: ignore
+                            ref_stmt = mod
+                            if not ref_stmt:
+                                # TODO: check why this is possible
+                                continue
                             # TODO: handle multiple module revisions
                             if ref_stmt.arg == stmt.arg:
                                 definition_uri = uri
