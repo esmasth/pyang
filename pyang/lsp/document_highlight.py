@@ -24,8 +24,11 @@ def text_document_document_highlight(
     if not wfc:
         return None
 
-    module = ls.modules[params.text_document.uri] # type: ignore
-    if not module:
+    try:
+        module = ls.modules[params.text_document.uri] # type: ignore
+        if not module:
+            return None
+    except KeyError:
         return None
     position = params.position
     match glue.stmt_from_lsp_position(module, position):

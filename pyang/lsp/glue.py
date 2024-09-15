@@ -20,7 +20,7 @@ def _match_part_position(
                     (pos.line == eline and echar <= pos.character):
                 return False
             return True
-        if schar < pos.character < echar:
+        if schar <= pos.character < echar:
             return True
     return False
 

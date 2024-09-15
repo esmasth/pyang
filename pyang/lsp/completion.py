@@ -345,8 +345,11 @@ def text_document_completion(
     if not wfc:
         return None
 
-    module: ModSubmodStatement | None = ls.modules[params.text_document.uri] # type: ignore
-    if not module:
+    try:
+        module: ModSubmodStatement | None = ls.modules[params.text_document.uri] # type: ignore
+        if not module:
+            return None
+    except KeyError:
         return None
     ctx = wfc.ctx
     position = params.position

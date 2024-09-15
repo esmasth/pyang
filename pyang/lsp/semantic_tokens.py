@@ -15,8 +15,9 @@ from typing import List, Tuple, Union
 from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
-from pyang import grammar, util
+from pyang import util
 from pyang.context import Context
+from pyang.grammar import data_def_stmts, flatten_spec, stmt_map
 from pyang.lsp import common
 from pyang.statements import ModSubmodStatement, Statement
 from pyang.types import yang_type_specs
@@ -107,17 +108,23 @@ def arg_token_idx(ctx: Context, stmt: Statement) -> int:
                 token_type = maps.keyword_map[stmt.keyword]['semantic']
             except KeyError:
                 try:
-                    arg_type = grammar.stmt_map[stmt.keyword][0]
+                    arg_type = stmt_map[stmt.keyword][0]
                     token_type = maps.arg_type_map[arg_type]['semantic']
                 except KeyError:
                     token_type = lsp.SemanticTokenTypes.Type
             return TOKEN_TYPES.index(token_type)
 
+def _is_deprecated(stmt: Statement) -> bool:
+    status = stmt.search_one('status')
+    if status:
+        return status.arg in ['deprecated', 'obsolete']
+    return False
+
 def _update_tok_mods(tok_mods: int, mod: str) -> int:
     tok_mods |= 1 << TOKEN_MODIFIERS.index(mod)
     return tok_mods
 
-def arg_tok_mods(stmt: Statement) -> int:
+def arg_tok_mods(ctx: Context, stmt: Statement, deprecated: bool = False) -> int:
     tok_mods = 0
     def _set_tok_mod(mod: str) -> None:
         nonlocal tok_mods
@@ -152,6 +159,8 @@ def arg_tok_mods(stmt: Statement) -> int:
             _set_tok_mod(lsp.SemanticTokenModifiers.Definition)
         case 'identity':
             _set_tok_mod(lsp.SemanticTokenModifiers.Definition)
+            if not stmt.search_one('base'):
+                _set_tok_mod(lsp.SemanticTokenModifiers.Abstract)
         case 'type':
             if stmt.arg in yang_type_specs:
                 _set_tok_mod(lsp.SemanticTokenModifiers.DefaultLibrary)
@@ -163,9 +172,17 @@ def arg_tok_mods(stmt: Statement) -> int:
         _set_tok_mod(lsp.SemanticTokenModifiers.Modification)
     if hasattr(stmt, 'i_config') and not stmt.i_config:
         _set_tok_mod(lsp.SemanticTokenModifiers.Readonly)
-    if (status := stmt.search_one('status')) and \
-            status.arg in ['deprecated', 'obsolete']:
+    if deprecated:
         _set_tok_mod(lsp.SemanticTokenModifiers.Deprecated)
+    elif stmt.keyword in common.ref_map:
+        ref_stmt = common.referenced_stmt_from_stmt_arg(ctx, stmt)
+        if ref_stmt and _is_deprecated(ref_stmt):
+            _set_tok_mod(lsp.SemanticTokenModifiers.Deprecated)
+    elif stmt.keyword == 'augment':
+        aug_stmt = common.get_augmented_stmt(stmt) # type: ignore
+        if aug_stmt and _is_deprecated(aug_stmt):
+            _set_tok_mod(lsp.SemanticTokenModifiers.Deprecated)
+
     return tok_mods
 
 def arg_tokens(
@@ -173,6 +190,16 @@ def arg_tokens(
     stmt: Statement,
 ) -> Tuple[List[SemanticToken], Tuple[int, int]]:
     return ([], (0, 0))
+
+def kwd_tok_mods(
+    ctx: Context,
+    stmt: Statement,
+) -> int:
+    ext_stmt = common.ext_stmt_from_stmt_kwd(ctx, stmt)
+    if ext_stmt:
+        if _is_deprecated(ext_stmt):
+            return _update_tok_mods(0, lsp.SemanticTokenModifiers.Deprecated)
+    return 0
 
 def kwd_tokens(
     ctx: Context,
@@ -185,6 +212,7 @@ def stmt_tokens(
     stmt: Statement,
     last_line: int = 0,
     last_char: int = 0,
+    parent_deprecated: bool = False,
 ) -> Tuple[List[SemanticToken], Tuple[int, int]]:
     tokens: List[SemanticToken] = []
     # kwd token
@@ -224,7 +252,7 @@ def stmt_tokens(
             schar += length
             length = len(keyword)
             tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Keyword)
-            tok_mods = 0
+            tok_mods = kwd_tok_mods(ctx, stmt)
             tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
     prev_line = sline
     prev_char = schar
@@ -238,21 +266,33 @@ def stmt_tokens(
         echar = sel_range.end.character
         delta_line, delta_char = delta_linechar(sline, schar, prev_line, prev_char)
         tok_mods = 0
+        if not parent_deprecated:
+            if _is_deprecated(stmt):
+                deprecated = True
+                parent_deprecated = True
+            else:
+                deprecated = False
+        else:
+            data_def_kwds = [x[0] for x in flatten_spec(data_def_stmts)]
+            if stmt.keyword in data_def_kwds + ['grouping']:
+                deprecated = True
+            else:
+                deprecated = False
         if eline == sline:
             # single line argument
             length = echar - schar
+            # XXX: presuming strings split by + are never on single line
+            substring = stmt.arg_substrings[0] # type: ignore
+            if substring[1] != '':
+                length = length - 2
+                delta_char += 1
             prefixed_arg_re = re.compile(r'(^[a-zA-Z0-9-_]+):([a-zA-Z0-9-_]+)$')
             m = prefixed_arg_re.match(stmt.arg)
             if not m:
                 tok_type = arg_token_idx(ctx, stmt)
-                tok_mods = arg_tok_mods(stmt)
-                # XXX: presuming strings split by + are never on single line
-                substring = stmt.arg_substrings[0] # type: ignore
-                if substring[1] != '':
-                    length = length - 2
-                    delta_char += 1
+                tok_mods = arg_tok_mods(ctx, stmt, deprecated)
                 tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
-            elif stmt.keyword == 'type':
+            elif stmt.keyword in ['type', 'if-feature', 'uses', 'base']:
                 # prefix
                 prefix = m.group(1)
                 arg = m.group(2)
@@ -274,12 +314,12 @@ def stmt_tokens(
                 schar += length
                 length = len(arg)
                 tok_type = arg_token_idx(ctx, stmt)
-                tok_mods = arg_tok_mods(stmt)
+                tok_mods = arg_tok_mods(ctx, stmt)
                 tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
         else:
             # multi line argument
             tok_type = arg_token_idx(ctx, stmt)
-            tok_mods = arg_tok_mods(stmt)
+            tok_mods = arg_tok_mods(ctx, stmt)
             # XXX: presuming strings split by + or \n are always aligned
             delta_char += 1
             for arg_substr in stmt.arg_substrings: # type: ignore
@@ -296,7 +336,13 @@ def stmt_tokens(
 
     # sub tokens
     for substmt in stmt.substmts:
-        substmt_tokens, (prev_line, prev_char) = stmt_tokens(ctx, substmt, prev_line, prev_char)
+        substmt_tokens, (prev_line, prev_char) = stmt_tokens(
+            ctx,
+            substmt,
+            prev_line,
+            prev_char,
+            parent_deprecated,
+        )
         tokens.extend(substmt_tokens)
 
     return (tokens, (prev_line, prev_char))
@@ -314,8 +360,11 @@ def text_document_semantic_tokens_full(
     if not wfc:
         return None
 
-    module: ModSubmodStatement = ls.modules[params.text_document.uri] # type: ignore
-    if not module:
+    try:
+        module = ls.modules[params.text_document.uri] # type: ignore
+        if not module:
+            return None
+    except KeyError:
         return None
 
     tokens = stmt_tokens(wfc.ctx, module)[0] # type: ignore

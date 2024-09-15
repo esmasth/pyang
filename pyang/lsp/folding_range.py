@@ -79,8 +79,11 @@ def text_document_folding_range(
     if not wfc:
         return None
 
-    module = ls.modules[params.text_document.uri] # type: ignore
-    if not module:
+    try:
+        module = ls.modules[params.text_document.uri] # type: ignore
+        if not module:
+            return None
+    except KeyError:
         return None
     ranges = []
     ranges.extend(_stmt_ranges(module))

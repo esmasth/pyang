@@ -26,8 +26,11 @@ def text_document_inline_value(
     if not wfc:
         return None
 
-    module = ls.modules[params.text_document.uri] # type: ignore
-    if not module:
+    try:
+        module = ls.modules[params.text_document.uri] # type: ignore
+        if not module:
+            return None
+    except KeyError:
         return None
     return [
         lsp.InlineValueText(

@@ -56,8 +56,11 @@ def text_document_references(
     if not wfc:
         return None
 
-    module = ls.modules[params.text_document.uri] # type: ignore
-    if not module:
+    try:
+        module = ls.modules[params.text_document.uri] # type: ignore
+        if not module:
+            return None
+    except KeyError:
         return None
     match glue.stmt_from_lsp_position(module, params.position):
         case (stmt, 'arg'):
@@ -84,8 +87,11 @@ def text_document_definition(
     if not wfc:
         return None
 
-    module = ls.modules[params.text_document.uri] # type: ignore
-    if not module:
+    try:
+        module = ls.modules[params.text_document.uri] # type: ignore
+        if not module:
+            return None
+    except KeyError:
         return None
     definition_uri = None
     origin_select_range = None
@@ -197,7 +203,7 @@ def text_document_definition(
                                     break
                         else:
                             # TODO: check why i_key was not populated in some cases
-                            for substmt in stmt.parent.substmts:
+                            for substmt in stmt.parent.i_children:
                                 if substmt.keyword == 'leaf' and key == substmt.arg:
                                     ref_stmt = substmt
                                     break
@@ -290,8 +296,11 @@ def text_document_type_definition(
     if not wfc:
         return None
 
-    module = ls.modules[params.text_document.uri] # type: ignore
-    if not module:
+    try:
+        module = ls.modules[params.text_document.uri] # type: ignore
+        if not module:
+            return None
+    except KeyError:
         return None
     uri = params.text_document.uri
     position = params.position

@@ -26,8 +26,11 @@ def text_document_hover(
     if not wfc:
         return None
 
-    module = ls.modules[params.text_document.uri] # type: ignore
-    if not module:
+    try:
+        module = ls.modules[params.text_document.uri] # type: ignore
+        if not module:
+            return None
+    except KeyError:
         return None
 
     hover_value = ''
@@ -100,6 +103,11 @@ def text_document_hover(
             if ref and ref.strip() != '':
                 hover_value += '\n\n*See*: ' + ref
             match stmt.keyword:
+                case (_, _):
+                    ext_stmt = common.ext_stmt_from_stmt_kwd(wfc.ctx, stmt)
+                    arg_stmt = ext_stmt.search_one('argument') if ext_stmt else None
+                    argument = arg_stmt.arg if arg_stmt else ''
+                    hover_value = append_hover(hover_value, argument)
                 case 'augment':
                     aug: statements.AugmentStatement = stmt # type: ignore
                     aug_stmt = common.get_augmented_stmt(aug)
@@ -126,6 +134,20 @@ def text_document_hover(
                         if desc and desc.strip() != '':
                             value = '**' + dev_stmt.keyword + '**: ' + desc
                             hover_value = append_hover(hover_value, value)
+                case 'deviate':
+                    try:
+                        deviate_rfcref = rfc.deviate_map[stmt.arg] # type: ignore
+                        hover_value = append_hover(hover_value, rfcref_value(deviate_rfcref))
+                    except KeyError:
+                        # ignore typo
+                        pass
+                case 'status':
+                    try:
+                        status_rfcref = rfc.status_map[stmt.arg] # type: ignore
+                        hover_value = append_hover(hover_value, rfcref_value(status_rfcref))
+                    except KeyError:
+                        # ignore typo
+                        pass
                 case 'path':
                     ref_stmt = common.get_leafrefed_stmt(stmt)
                     if ref_stmt:
@@ -190,7 +212,7 @@ def text_document_hover(
                                     break
                         else:
                             # TODO: check why i_key was not populated in some cases
-                            for substmt in stmt.parent.substmts:
+                            for substmt in stmt.parent.i_children:
                                 if substmt.keyword == 'leaf' and key == substmt.arg:
                                     key_stmt = substmt
                                     break
