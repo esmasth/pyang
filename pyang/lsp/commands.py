@@ -47,7 +47,11 @@ def generate_puml_diagram(
     if len(args) != 1:
         return
     active_doc_uri = args[0]
-    if not active_doc_uri:
+    if not active_doc_uri or not active_doc_uri.endswith('.yang'):
+        return
+    try:
+        module = ls.modules[active_doc_uri] # type: ignore
+    except KeyError:
         return
 
     wfc = common.get_workspace_folder_context(ls, active_doc_uri)
@@ -56,7 +60,6 @@ def generate_puml_diagram(
     text_doc_uri = active_doc_uri + '.puml'
     if not text_doc_uri:
         return
-    module = ls.modules[active_doc_uri] # type: ignore
 
     try:
         text_doc_content = _generate_puml(wfc, module)
@@ -132,7 +135,11 @@ def generate_tree_diagram(
     if len(args) != 1:
         return
     active_doc_uri = args[0]
-    if not active_doc_uri:
+    if not active_doc_uri or not active_doc_uri.endswith('.yang'):
+        return
+    try:
+        module = ls.modules[active_doc_uri] # type: ignore
+    except KeyError:
         return
 
     wfc = common.get_workspace_folder_context(ls, active_doc_uri)
@@ -141,7 +148,6 @@ def generate_tree_diagram(
     text_doc_uri = active_doc_uri + '.ytd'
     if not text_doc_uri:
         return
-    module = ls.modules[active_doc_uri] # type: ignore
 
     try:
         text_doc_content = _generate_tree(wfc, module)
