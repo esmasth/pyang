@@ -180,10 +180,12 @@ class LintPlugin(plugin.PyangPlugin):
         error.add_error_code(
             'LINT_TOP_MANDATORY', 3,
             'RFC 8407: 4.10: '
-            + 'top-level node %s must not be mandatory')
+            + 'top-level node %s must not be mandatory',
+            'https://datatracker.ietf.org/doc/html/rfc8407#section-4.10')
         error.add_error_code(
             'LINT_NOT_HYPHENATED', 4,
-            '%s is not hyphenated, e.g., using upper-case or underscore')
+            '%s is not hyphenated, e.g., using upper-case or underscore',
+            'https://datatracker.ietf.org/doc/html/rfc8407#section-4.3.1')
 
         # override std error string
         error.add_error_code(

@@ -19,7 +19,7 @@ from pyang import util
 from pyang.context import Context
 from pyang.grammar import data_def_stmts, flatten_spec, stmt_map
 from pyang.lsp import common
-from pyang.statements import ModSubmodStatement, Statement
+from pyang.statements import Statement
 from pyang.types import yang_type_specs
 
 from . import glue, maps

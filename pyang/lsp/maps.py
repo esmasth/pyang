@@ -230,6 +230,7 @@ keyword_map = {
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Property,
         'modifiers' : [
+            lsp.SemanticTokenModifiers.Declaration,
         ],
     },
     'revision': {
@@ -283,6 +284,7 @@ keyword_map = {
         'completion': lsp.CompletionItemKind.Property,
         'semantic'  : lsp.SemanticTokenTypes.Namespace,
         'modifiers' : [
+            lsp.SemanticTokenModifiers.Declaration,
         ],
     },
     'feature': {
@@ -290,6 +292,7 @@ keyword_map = {
         'completion': lsp.CompletionItemKind.Constant,
         'semantic'  : lsp.SemanticTokenTypes.Interface,
         'modifiers' : [
+            lsp.SemanticTokenModifiers.Definition,
         ],
     },
     'if-feature': {
@@ -332,6 +335,7 @@ keyword_map = {
         'completion': lsp.CompletionItemKind.Struct,
         'semantic'  : lsp.SemanticTokenTypes.Macro,
         'modifiers' : [
+            lsp.SemanticTokenModifiers.Declaration,
         ],
     },
     'extension': {
@@ -339,6 +343,7 @@ keyword_map = {
         'completion': lsp.CompletionItemKind.Operator,
         'semantic'  : lsp.SemanticTokenTypes.Keyword,
         'modifiers' : [
+            lsp.SemanticTokenModifiers.Definition,
         ],
     },
     'key': {
@@ -466,6 +471,7 @@ keyword_map = {
         'completion': lsp.CompletionItemKind.EnumMember,
         'semantic'  : lsp.SemanticTokenTypes.String,
         'modifiers' : [
+            lsp.SemanticTokenModifiers.Documentation,
         ],
     },
     'presence': {
@@ -473,6 +479,7 @@ keyword_map = {
         'completion': lsp.CompletionItemKind.TypeParameter,
         'semantic'  : lsp.SemanticTokenTypes.String,
         'modifiers' : [
+            lsp.SemanticTokenModifiers.Documentation,
         ],
     },
     'value': {
@@ -499,7 +506,7 @@ keyword_map = {
     'anyxml': {
         'symbol'    : lsp.SymbolKind.Variable,
         'completion': lsp.CompletionItemKind.Variable,
-        'semantic'  : lsp.SemanticTokenTypes.String,
+        'semantic'  : lsp.SemanticTokenTypes.Variable,
         'modifiers' : [
         ],
     },

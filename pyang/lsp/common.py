@@ -202,15 +202,14 @@ def ext_stmt_from_stmt_kwd(
     return _stmt_from_arg(ref_module)
 
 def get_reference(stmt: Statement):
-    if not stmt.keyword in ['module', 'submodule']:
-        refstmt = stmt.search_one('reference')
-        if refstmt:
-            return refstmt.arg
-        return None
-    latest_rev = util.get_latest_revision(stmt)
-    for revstmt in stmt.search('revision'):
-        if revstmt.arg == latest_rev:
-            return get_reference(revstmt)
+    refstmt = stmt.search_one('reference')
+    if refstmt:
+        return refstmt.arg
+    if stmt.keyword in ['module', 'submodule']:
+        latest_rev = util.get_latest_revision(stmt)
+        for revstmt in stmt.search('revision'):
+            if revstmt.arg == latest_rev:
+                return get_reference(revstmt)
     return None
 
 

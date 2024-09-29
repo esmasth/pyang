@@ -19,6 +19,7 @@ from pygls.workspace import TextDocument
 
 from pyang.context import Context
 from pyang.lsp import server
+from pyang.statements import ModSubmodStatement
 from pyang.translators import yang
 from pyang.workspace import WorkspaceFolderContext
 from . import common
@@ -36,7 +37,12 @@ def _update_ctx_module(ctx: Context, text_doc: TextDocument):
     server._delete_from_ctx(ctx, text_doc)
     return server._add_to_ctx(ctx, text_doc)
 
-def _format_yang(wfc: WorkspaceFolderContext, source: str, opts, module) -> str:
+def _format_yang(
+    wfc: WorkspaceFolderContext,
+    source: str,
+    opts,
+    module: ModSubmodStatement,
+) -> str:
     ls: LanguageServer = wfc.ls # type: ignore
     if opts.insert_spaces is False:
         ls.log_trace("insert_spaces is currently restricted to True")

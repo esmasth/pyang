@@ -99,6 +99,10 @@ def text_document_hover(
                 else:
                     value = desc
                 hover_value = append_hover(hover_value, value)
+            if stmt.keyword == 'container':
+                presence = stmt.search_one('presence')
+                if presence and presence.arg and presence.arg.strip() != '':
+                    hover_value = append_hover(hover_value, '**presence**: ' + presence.arg)
             ref = common.get_reference(stmt)
             if ref and ref.strip() != '':
                 hover_value += '\n\n*See*: ' + ref
@@ -113,8 +117,14 @@ def text_document_hover(
                     aug_stmt = common.get_augmented_stmt(aug)
                     if aug_stmt:
                         desc = statements.get_description(aug_stmt)
+                        presence_value = ''
+                        if aug_stmt.keyword == 'container':
+                            presence = aug_stmt.search_one('presence')
+                            if presence and presence.arg and presence.arg.strip() != '':
+                                presence_value = '\n\n **presence**: ' + presence.arg
                         if desc and desc.strip() != '':
-                            value = '**' + aug_stmt.keyword + '**: ' + desc
+                            value = '**' + aug_stmt.keyword + '**: ' + desc + \
+                                presence_value
                             hover_value = append_hover(hover_value, value)
                 case 'refine':
                     ref_stmt = common.get_refined_stmt(stmt)

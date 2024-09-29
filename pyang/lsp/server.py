@@ -14,6 +14,7 @@ from pygls.workspace import TextDocument
 from pygls.uris import from_fs_path, to_fs_path
 
 from pyang import context, plugin, syntax, workspace
+from pyang.lsp import commands
 from pyang.statements import ModSubmodStatement, Statement
 
 from . import (
@@ -73,6 +74,7 @@ class PyangLanguageServer(LanguageServer):
 pyangls = PyangLanguageServer()
 
 code_lens.register_callbacks(pyangls)
+commands.register_callbacks(pyangls)
 completion.register_callbacks(pyangls)
 cross_reference.register_callbacks(pyangls)
 diagnostics.register_callbacks(pyangls)
@@ -93,9 +95,9 @@ def add_opts(optparser: optparse.OptionParser):
                              dest="pyangls_mode",
                              default=default_mode,
                              metavar="LSP_MODE",
-                             help="Provide LSP Service in this mode" \
-                             "Supported LSP server modes are: " +
-                             ', '.join(supported_modes)),
+                             help="Provide LSP Service in this mode. " \
+                                  "Supported LSP server modes are: " +
+                                  ', '.join(supported_modes)),
         optparse.make_option("--lsp-host",
                              dest="pyangls_host",
                              default=default_host,
@@ -116,9 +118,9 @@ def add_opts(optparser: optparse.OptionParser):
                              dest="pyangls_loglevel",
                              default='warning',
                              metavar="LSP_LOG_LEVEL",
-                             help="Write LSP Server logs at this level" \
-                                 "Supported log levels are: " +
-                                 "debug, info, warning, error, critical"),
+                             help="Write LSP Server logs at this level. " \
+                                  "Supported log levels are: " +
+                                  "debug, info, warning, error, critical"),
         ]
     g = optparser.add_option_group("LSP Server specific options")
     g.add_options(optlist)
