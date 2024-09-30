@@ -9,7 +9,6 @@ from typing import List
 
 from lsprotocol import types as lsp
 from pygls.server import LanguageServer
-from pygls.uris import from_fs_path
 
 from pyang.error import EmitError
 from pyang.lsp import common
@@ -24,7 +23,7 @@ def _generate_puml(
     wfc: WorkspaceFolderContext,
     module: ModSubmodStatement,
 ) -> str:
-    """Generates PlantUML diagram text."""
+    """Generates YANG PlantUML diagram text."""
     pumlfmt.setup_fmt(wfc.ctx) # type: ignore
     pumlfmt.pre_validate(wfc.ctx, [module]) # type: ignore
     tmpfd = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
@@ -67,7 +66,7 @@ def generate_puml_diagram(
         ls.show_message(
             message=f"Did not generate PlantUML diagram for \"{active_doc_uri}\"." +
                     "\n\nPlease resolve YANG errors and warnings and try again.",
-            msg_type=lsp.MessageType.Error,
+            msg_type=lsp.MessageType.Warning,
         )
         return
 
@@ -113,7 +112,7 @@ def _generate_tree(
     wfc: WorkspaceFolderContext,
     module: ModSubmodStatement,
 ) -> str:
-    """Generates tree diagram text."""
+    """Generates YANG tree diagram text."""
     treefmt.setup_fmt(wfc.ctx) # type: ignore
     tmpfd = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
 
@@ -155,7 +154,7 @@ def generate_tree_diagram(
         ls.show_message(
             message=f"Did not generate YANG Tree diagram for \"{active_doc_uri}\"." +
                     "\n\nPlease resolve YANG errors and warnings and try again.",
-            msg_type=lsp.MessageType.Error,
+            msg_type=lsp.MessageType.Warning,
         )
         return
 

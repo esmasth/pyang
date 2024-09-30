@@ -76,7 +76,7 @@ class UMLPlugin(plugin.PyangPlugin):
                                  dest="uml_no",
                                  default="",
                                  help="Suppress parts of the diagram. \nValid suppress values are: module, uses, leafref, identity, identityref, typedef, import, annotation, circles, stereotypes, prefix, footer, title. "
-                                      "Annotations suppresses YANG constructs represented as annotations such as config statements for containers and module info. Module suppresses module box around the diagram and module information. " 
+                                      "Annotations suppresses YANG constructs represented as annotations such as config statements for containers and module info. Module suppresses module box around the diagram and module information. "
                                       "Prefix suppresses the the prefix in the name of packages. \nIf footer or title are selected, the options --uml-footer and --uml-title respectively will be ignored. \nExample --uml-no=circles,stereotypes,typedef,import"),
             optparse.make_option("--uml-truncate",
                                  dest="uml_truncate",
@@ -179,21 +179,7 @@ class uml_emitter:
 
     ctx_filterfile = False
     ctx_usefilterfile = None
-    groupings = dict()
-    uses = []
-    uses_as_string = dict()
-    leafrefs = []
-    filterpaths = []
-    identities = []
-    augments = []
-    augmentpaths = []
-    baseid = []
-    thismod_prefix = ''
     _ctx = None
-    post_strings = []
-    end_strings = []
-    module_prefixes = []
-    leafref_classes = []
 
     choice_relation_symbol = ".."
     case_relation_symbol = ".."
@@ -201,6 +187,20 @@ class uml_emitter:
     uses_relation_label = "uses"
 
     def __init__(self, ctx):
+        self.groupings = {}
+        self.uses = []
+        self.uses_as_string = {}
+        self.leafrefs = []
+        self.filterpaths = []
+        self.identities = []
+        self.augments = []
+        self.augmentpaths = []
+        self.baseid = []
+        self.thismod_prefix = ''
+        self.post_strings = []
+        self.end_strings = []
+        self.module_prefixes = []
+        self.leafref_classes = []
         self._ctx = ctx
         self.ctx_fullpath = ctx.opts.uml_longids
         self.ctx_description = ctx.opts.uml_descr
