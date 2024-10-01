@@ -274,7 +274,8 @@ Validates the YANG module in <filename> (or stdin), and all its dependencies."""
             print(str(e))
             print("Please resolve dependencies to use pyang as an LSP server")
             sys.exit(1)
-        pyangls.start_server(o)
+        ls = pyangls.init()
+        pyangls.start_server(ls, o)
         sys.exit(0)
 
     if o.verbose:

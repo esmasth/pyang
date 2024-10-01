@@ -71,22 +71,33 @@ class PyangLanguageServer(LanguageServer):
             text_document_sync_kind=lsp.TextDocumentSyncKind.Full
         )
 
-pyangls = PyangLanguageServer()
+def init() -> PyangLanguageServer:
+    pyangls = PyangLanguageServer()
 
-code_lens.register_callbacks(pyangls)
-commands.register_callbacks(pyangls)
-completion.register_callbacks(pyangls)
-cross_reference.register_callbacks(pyangls)
-diagnostics.register_callbacks(pyangls)
-document_highlight.register_callbacks(pyangls)
-document_link.register_callbacks(pyangls)
-folding_range.register_callbacks(pyangls)
-formatting.register_callbacks(pyangls)
-hover.register_callbacks(pyangls)
-inlay_hint.register_callbacks(pyangls)
-inline_value.register_callbacks(pyangls)
-symbols.register_callbacks(pyangls)
-semantic_tokens.register_callbacks(pyangls)
+    pyangls.feature(lsp.INITIALIZED)(initialized)
+    pyangls.feature(lsp.TEXT_DOCUMENT_DID_OPEN)(text_document_did_open)
+    pyangls.feature(lsp.TEXT_DOCUMENT_DID_CHANGE)(text_document_did_change)
+    pyangls.feature(lsp.TEXT_DOCUMENT_DID_CLOSE)(text_document_did_close)
+    pyangls.feature(lsp.WORKSPACE_DID_CHANGE_CONFIGURATION)(workspace_did_change_configuration)
+    pyangls.feature(lsp.WORKSPACE_DID_CHANGE_WATCHED_FILES)(workspace_did_change_watched_files)
+
+    code_lens.register_callbacks(pyangls)
+    commands.register_callbacks(pyangls)
+    completion.register_callbacks(pyangls)
+    cross_reference.register_callbacks(pyangls)
+    diagnostics.register_callbacks(pyangls)
+    document_highlight.register_callbacks(pyangls)
+    document_link.register_callbacks(pyangls)
+    folding_range.register_callbacks(pyangls)
+    formatting.register_callbacks(pyangls)
+    hover.register_callbacks(pyangls)
+    inlay_hint.register_callbacks(pyangls)
+    inline_value.register_callbacks(pyangls)
+    signature.register_callbacks(pyangls)
+    symbols.register_callbacks(pyangls)
+    semantic_tokens.register_callbacks(pyangls)
+
+    return pyangls
 
 def add_opts(optparser: optparse.OptionParser):
     optlist = [
@@ -125,7 +136,7 @@ def add_opts(optparser: optparse.OptionParser):
     g = optparser.add_option_group("LSP Server specific options")
     g.add_options(optlist)
 
-def start_server(optargs: optparse.Values):
+def start_server(pyangls: PyangLanguageServer, optargs: optparse.Values):
     if optargs.pyangls_logdir == '.':
         log_dir = optargs.proj_dir
     else:
@@ -153,19 +164,19 @@ def start_server(optargs: optparse.Values):
     else:
         pyangls.start_io()
 
-def _delete_from_ctx(ctx: context.Context, text_doc: TextDocument):
-    if not pyangls.modules:
+def _delete_from_ctx(ls: PyangLanguageServer, ctx: context.Context, text_doc: TextDocument):
+    if not ls.modules:
         return
     try:
-        module = pyangls.modules[text_doc.uri]
+        module = ls.modules[text_doc.uri]
         if not module:
             return
     except KeyError:
         return
     ctx.del_module(module)
-    del pyangls.modules[text_doc.uri]
+    del ls.modules[text_doc.uri]
 
-def _add_to_ctx(ctx: context.Context, text_doc: TextDocument):
+def _add_to_ctx(ls: PyangLanguageServer, ctx: context.Context, text_doc: TextDocument):
     assert text_doc.filename
     m = syntax.re_filename.search(text_doc.filename)
     if m is not None:
@@ -179,14 +190,14 @@ def _add_to_ctx(ctx: context.Context, text_doc: TextDocument):
         module = ctx.add_module(text_doc.path, text_doc.source,
                                 primary_module=True)
     # if module:
-    pyangls.modules[text_doc.uri] = module
+    ls.modules[text_doc.uri] = module
     return module
 
-def _update_ctx_modules(ctx: context.Context):
-    for text_doc in pyangls.workspace.documents.values():
-        _delete_from_ctx(ctx, text_doc)
-    for text_doc in pyangls.workspace.documents.values():
-        _add_to_ctx(ctx, text_doc)
+def _update_ctx_modules(ls: PyangLanguageServer, ctx: context.Context):
+    for text_doc in ls.workspace.documents.values():
+        _delete_from_ctx(ls, ctx, text_doc)
+    for text_doc in ls.workspace.documents.values():
+        _add_to_ctx(ls, ctx, text_doc)
 
 def _clear_stmt_validation(stmt: Statement):
     stmt.i_is_validated = False
@@ -194,9 +205,9 @@ def _clear_stmt_validation(stmt: Statement):
     for substmt in stmt.substmts:
         _clear_stmt_validation(substmt)
 
-def _clear_ctx_validation(ctx: context.Context):
-    pyangls.doc_symbols = {}
-    pyangls.diagnostics = {}
+def _clear_ctx_validation(ls: PyangLanguageServer, ctx: context.Context):
+    ls.doc_symbols = {}
+    ls.diagnostics = {}
     ctx.errors = []
     module : Statement
     for module in ctx.modules.values():
@@ -243,7 +254,6 @@ def _process_workspace_configuration(_scope: str | None, _config: List[Any]):
 ################################################################################
 
 
-@pyangls.feature(lsp.INITIALIZED)
 def initialized(
     ls: PyangLanguageServer,
     _params: lsp.InitializedParams,
@@ -252,7 +262,7 @@ def initialized(
 
     def init_workspace_folder(wfc: workspace.WorkspaceFolderContext, uri: str):
         wfc.ls = ls # type: ignore
-        _clear_ctx_validation(wfc.ctx)
+        _clear_ctx_validation(ls, wfc.ctx)
         yang_uris = _get_folder_yang_uris(uri)
         for yang_uri in yang_uris:
             if not yang_uri in ls.workspace.text_documents.keys():
@@ -271,7 +281,7 @@ def initialized(
                         text=yang_source,
                     )
                 )
-        _update_ctx_modules(wfc.ctx)
+        _update_ctx_modules(ls, wfc.ctx)
         _validate_ctx_modules(wfc.ctx)
         diagnostics.publish_workspace_folder_diagnostics(wfc)
 
@@ -323,9 +333,8 @@ def initialized(
 ################################################################################
 
 
-@pyangls.feature(lsp.TEXT_DOCUMENT_DID_OPEN)
 def text_document_did_open(
-    ls: LanguageServer,
+    ls: PyangLanguageServer,
     params: lsp.DidOpenTextDocumentParams,
 ):
     """Handles LSP `textDocument/didOpen` notification."""
@@ -347,17 +356,16 @@ def text_document_did_open(
         return
 
     # File content of opened file is not matching ex
-    _clear_ctx_validation(wfc.ctx)
-    _update_ctx_modules(wfc.ctx)
+    _clear_ctx_validation(ls, wfc.ctx)
+    _update_ctx_modules(ls, wfc.ctx)
     _validate_ctx_modules(wfc.ctx)
     diagnostics.publish_workspace_folder_diagnostics(wfc)
 
 
 # pyang supports LSP `TextDocumentSyncKind` `Full` but not `Incremental`
 # The mapping is provided via initialization parameters of pygls LanguageServer
-@pyangls.feature(lsp.TEXT_DOCUMENT_DID_CHANGE)
 def text_document_did_change(
-    ls: LanguageServer,
+    ls: PyangLanguageServer,
     params: lsp.DidChangeTextDocumentParams,
 ):
     """Handles LSP `textDocument/didChange` notification."""
@@ -366,19 +374,18 @@ def text_document_did_change(
     if not wfc:
         return
 
-    _clear_ctx_validation(wfc.ctx)
+    _clear_ctx_validation(ls, wfc.ctx)
 
     for content_change in params.content_changes:
         ls.workspace.update_text_document(params.text_document, content_change)
 
-    _update_ctx_modules(wfc.ctx)
+    _update_ctx_modules(ls, wfc.ctx)
     _validate_ctx_modules(wfc.ctx)
     diagnostics.publish_workspace_folder_diagnostics(wfc)
 
 
-@pyangls.feature(lsp.TEXT_DOCUMENT_DID_CLOSE)
 def text_document_did_close(
-    ls: LanguageServer,
+    ls: PyangLanguageServer,
     params: lsp.DidCloseTextDocumentParams,
 ):
     """Handles LSP `textDocument/didClose` notification."""
@@ -403,8 +410,8 @@ def text_document_did_close(
     # textDocument/didChange notification before textDocument/didClose for the
     # case when an edited buffer window is killed without saving so that the
     # project diagnostics are still consistent
-    _clear_ctx_validation(wfc.ctx)
-    _update_ctx_modules(wfc.ctx)
+    _clear_ctx_validation(ls, wfc.ctx)
+    _update_ctx_modules(ls, wfc.ctx)
     _validate_ctx_modules(wfc.ctx)
     diagnostics.publish_workspace_folder_diagnostics(wfc)
 
@@ -423,7 +430,6 @@ def text_document_did_close(
 ################################################################################
 
 
-@pyangls.feature(lsp.WORKSPACE_DID_CHANGE_CONFIGURATION)
 def workspace_did_change_configuration(
     ls: PyangLanguageServer,
     params: lsp.DidChangeConfigurationParams,
@@ -433,7 +439,7 @@ def workspace_did_change_configuration(
     # TODO: Handle config changes including ignoring additional files/subdirs
     _process_workspace_configuration(None, [params.settings])
     for wfc in ls.wfc.values():
-        _clear_ctx_validation(wfc.ctx)
+        _clear_ctx_validation(ls, wfc.ctx)
 
     if ls.workspace.folders:
         # TODO: Handle more than one workspace folder
@@ -456,14 +462,13 @@ def workspace_did_change_configuration(
                 )
 
     for wfc in ls.wfc.values():
-        _update_ctx_modules(wfc.ctx)
+        _update_ctx_modules(ls, wfc.ctx)
         _validate_ctx_modules(wfc.ctx)
         diagnostics.publish_workspace_folder_diagnostics(wfc)
 
 
-@pyangls.feature(lsp.WORKSPACE_DID_CHANGE_WATCHED_FILES)
 def workspace_did_change_watched_files(
-    ls: LanguageServer,
+    ls: PyangLanguageServer,
     params: lsp.DidChangeWatchedFilesParams,
 ):
     """Handles LSP `workspace/didChangeWatchedFiles` notification."""
@@ -472,7 +477,7 @@ def workspace_did_change_watched_files(
     wfc = common.get_workspace_folder_context(ls, params.changes[0].uri)
     if not wfc:
         return
-    _clear_ctx_validation(wfc.ctx)
+    _clear_ctx_validation(ls, wfc.ctx)
 
     # Process all the Deleted events first to handle renames gracefully
     for event in params.changes:
@@ -481,7 +486,7 @@ def workspace_did_change_watched_files(
 
         text_doc = ls.workspace.get_text_document(event.uri)
         ls.workspace.remove_text_document(text_doc.uri)
-        _delete_from_ctx(wfc.ctx, text_doc)
+        _delete_from_ctx(ls, wfc.ctx, text_doc)
         diagnostics.publish_document_diagnostics(wfc, text_doc, [])
 
     for event in params.changes:
@@ -503,7 +508,7 @@ def workspace_did_change_watched_files(
             text_doc = ls.workspace.get_text_document(event.uri)
             text_doc._source = None
 
-    _update_ctx_modules(wfc.ctx)
+    _update_ctx_modules(ls, wfc.ctx)
     _validate_ctx_modules(wfc.ctx)
     diagnostics.publish_workspace_folder_diagnostics(wfc)
 
