@@ -10,8 +10,9 @@ from typing import Union
 from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
-from pyang import statements
+from pyang import grammar, statements
 from pyang.statements import Statement
+from pyang.translators import yang
 
 from . import common, glue, rfc
 
@@ -50,7 +51,66 @@ def text_document_hover(
         return current
 
     def rfcref_value(rfcref: dict[str, str]) -> str:
-        return rfcref['title'] + '\n\n' + rfcref['brief'] + '\n\n' + rfcref['uri']
+        # return rfcref['title'] + '\n\n' + rfcref['brief'] + '\n\n' + rfcref['uri']
+        return rfcref['brief'] + '\n\n' + rfcref['uri']
+
+    def signature_value(keyword) -> str:
+        def stmt_signature(keyword, depth, cardinality) -> str:
+            if keyword == grammar.cut[0]:
+                return ''
+            (argtype, subspec) = grammar.stmt_map[keyword]
+            if argtype in yang._non_quote_arg_type:  #pylint: disable=protected-access
+                quote = ''
+            elif argtype in yang._keyword_prefer_single_quote_arg:  #pylint: disable=protected-access
+                quote = "'"
+            else:
+                quote = '"'
+            if argtype in yang._force_newline_arg:  #pylint: disable=protected-access
+                newline = '\n  '
+            else:
+                newline = ' '
+            flatspec = grammar.flatten_spec(subspec)
+            mandatory = ''
+            if depth > 0:
+                match cardinality:
+                    case '1':
+                        mandatory = ' // 1   '
+                    case '*':
+                        mandatory = ' // 0..n'
+                    case '+':
+                        mandatory = ' // 1..n'
+                    case '?':
+                        mandatory = ' // 0..1'
+                    case _:
+                        mandatory = ''
+            if len(flatspec) > 0:
+                substmts = ''
+                if depth > 0:
+                    children = ' {...}'
+                else:
+                    for substmt in flatspec:
+                        substmt_kewd = substmt[0]
+                        substmt_card = substmt[1]
+                        if isinstance(substmt_kewd, tuple):
+                            # substmts += '\n  ' + substmt_keyword[0] + ':' + substmt_keyword[1]
+                            continue
+                        substmts += stmt_signature(substmt_kewd, depth + 1, substmt_card)
+                    children = \
+                        ' {\n' + \
+                        substmts + \
+                        (depth + 1) * '  ' + '...\n' + \
+                        depth * '  ' + '}'
+            else:
+                children = ';'
+            return \
+                depth * '  ' + f'{keyword}{newline}{quote}{argtype}{quote}' + \
+                children + \
+                mandatory + \
+                '\n'
+        return \
+            '```yang\n' + \
+            stmt_signature(keyword, 0, None) + \
+            '```\n'
 
     hover_range = None
     match glue.stmt_from_lsp_position(module, params.position):
@@ -64,6 +124,7 @@ def text_document_hover(
                 except (KeyError, AttributeError):
                     # No parent specific reference map exists, use generic map
                     kwd_rfcref = rfc.stmt_map[stmt.keyword]
+                hover_value = append_hover(hover_value, signature_value(stmt.keyword))
                 hover_value = append_hover(hover_value, rfcref_value(kwd_rfcref))
             except KeyError:
                 match stmt.keyword:
