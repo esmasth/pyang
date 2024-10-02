@@ -33,9 +33,9 @@ default_remove_unused_imports = False
 default_remove_comments = False
 
 
-def _update_ctx_module(ctx: Context, text_doc: TextDocument):
-    server._delete_from_ctx(ctx, text_doc)
-    return server._add_to_ctx(ctx, text_doc)
+def _update_ctx_module(ls: LanguageServer, ctx: Context, text_doc: TextDocument):
+    server._delete_from_ctx(ls, ctx, text_doc) # type: ignore
+    return server._add_to_ctx(ls, ctx, text_doc) # type: ignore
 
 def _format_yang(
     wfc: WorkspaceFolderContext,
@@ -93,7 +93,7 @@ def text_document_formatting(
         ls.show_message("No source found")
         return []
 
-    module = _update_ctx_module(wfc.ctx, text_doc)
+    module = _update_ctx_module(ls, wfc.ctx, text_doc)
     if module is None:
         if common.have_parser_errors(wfc.ctx): # type: ignore
             ls.show_message("Document was syntactically invalid. Did not format.",
