@@ -70,7 +70,7 @@ def stmt_hints(
             create_item(
                 line=line,
                 character=character,
-                label_value='key',
+                label_value='/* key */',
                 label_tooltip_value='`list` key',
                 tooltip_value='`list` key',
             )
