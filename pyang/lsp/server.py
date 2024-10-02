@@ -93,7 +93,6 @@ def init() -> PyangLanguageServer:
     hover.register_callbacks(pyangls)
     inlay_hint.register_callbacks(pyangls)
     inline_value.register_callbacks(pyangls)
-    signature.register_callbacks(pyangls)
     symbols.register_callbacks(pyangls)
     semantic_tokens.register_callbacks(pyangls)
 
