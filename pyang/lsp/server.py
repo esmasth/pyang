@@ -14,12 +14,12 @@ from pygls.workspace import TextDocument
 from pygls.uris import from_fs_path, to_fs_path
 
 from pyang import context, plugin, syntax, workspace
-from pyang.lsp import commands
 from pyang.statements import ModSubmodStatement, Statement
 
 from . import (
     common,
     code_lens,
+    commands,
     completion,
     cross_reference,
     diagnostics,
@@ -27,6 +27,7 @@ from . import (
     document_link,
     folding_range,
     formatting,
+    hierarchy,
     hover,
     inlay_hint,
     inline_value,
@@ -90,6 +91,7 @@ def init() -> PyangLanguageServer:
     document_link.register_callbacks(pyangls)
     folding_range.register_callbacks(pyangls)
     formatting.register_callbacks(pyangls)
+    hierarchy.register_callbacks(pyangls)
     hover.register_callbacks(pyangls)
     inlay_hint.register_callbacks(pyangls)
     inline_value.register_callbacks(pyangls)
