@@ -74,7 +74,7 @@ def text_document_hover(
             if depth > 0:
                 match cardinality:
                     case '1':
-                        mandatory = ' // 1   '
+                        mandatory = ' // 1'
                     case '*':
                         mandatory = ' // 0..n'
                     case '+':
