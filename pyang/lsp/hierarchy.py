@@ -14,6 +14,7 @@
   https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_subtypes
 """
 
+from posixpath import basename
 from typing import List, Union
 
 from lsprotocol import types as lsp
@@ -22,6 +23,8 @@ from pygls.uris import from_fs_path
 
 from pyang.lsp import common, glue
 from pyang.statements import ModSubmodStatement
+from pyang.types import yang_type_specs
+
 
 def text_document_prepare_call_hierarchy(
     ls: LanguageServer,
@@ -49,7 +52,7 @@ def text_document_prepare_call_hierarchy(
 
     call_hierarchy_items = []
 
-    symbol_range = glue.epos_to_lsp_range(stmt.pos)
+    symbol_range = glue.stmt_lsp_range(stmt.pos)
     selection_range = glue.arg_lsp_selection_range(stmt.pos)
     tags = []
 
@@ -193,6 +196,7 @@ def call_hierarchy_outgoing_calls(
 
     return call_hierarchy_items
 
+
 def text_document_prepare_type_hierarchy(
     ls: LanguageServer,
     params: lsp.TypeHierarchyPrepareParams
@@ -203,20 +207,60 @@ def text_document_prepare_type_hierarchy(
     if not wfc:
         return None
 
+    try:
+        module = ls.modules[params.text_document.uri] # type: ignore
+        if not module:
+            return None
+    except KeyError:
+        return None
+
     type_hierarchy_items = []
 
-    type_name='testType'
-    type_kind=lsp.SymbolKind.Class
-    type_range=lsp.Range(lsp.Position(0, 0), lsp.Position(0, 0))
-    type_select_range=lsp.Range(lsp.Position(0, 0), lsp.Position(0, 0))
-    type_tags=[lsp.SymbolTag.Deprecated]
-    type_detail='testDetail'
+    match glue.stmt_from_lsp_position(module, params.position):
+        case (stmt, 'arg'):
+            if not stmt or not stmt.arg:
+                return None
+            match stmt.keyword:
+                case 'typedef' | 'type':
+                    type_kind = lsp.SymbolKind.Class
+                    type_tags = []
+                    if stmt.arg in yang_type_specs:
+                        type_name = stmt.arg
+                        type_detail = 'built-in'
+                        type_uri = params.text_document.uri
+                        type_pos = stmt.pos
+                    else:
+                        if stmt.keyword == 'typedef':
+                            prefix = stmt.top.i_prefix
+                            type_name = prefix + ':' + stmt.arg
+                            typedef_stmt = stmt
+                            type_uri = params.text_document.uri
+                            type_pos = stmt.pos
+                        else:
+                            type_name = stmt.arg
+                            typedef_stmt = common.referenced_stmt_from_stmt_arg(wfc.ctx, stmt)
+                            if not typedef_stmt:
+                                return None
+                            type_uri = from_fs_path(typedef_stmt.top.pos.ref)
+                            if not type_uri:
+                                return None
+                            type_pos = typedef_stmt.pos
+                            status_stmt = typedef_stmt.search_one('status')
+                            if status_stmt and status_stmt.arg in ['deprecated', 'obsolete']:
+                                type_tags.append(lsp.SymbolTag.Deprecated)
+                        type_detail = f"typedef ({basename(typedef_stmt.top.pos.ref)})"
+                    type_range = glue.stmt_lsp_range(type_pos)
+                    type_select_range = glue.arg_lsp_selection_range(type_pos)
+                case _:
+                    return None
+        case _:
+            return None
 
     type_hierarchy_items.append(
         lsp.TypeHierarchyItem(
             name=type_name,
             kind=type_kind,
-            uri=params.text_document.uri,
+            uri=type_uri,
             range=type_range,
             selection_range=type_select_range,
             tags=type_tags,
@@ -225,39 +269,6 @@ def text_document_prepare_type_hierarchy(
     )
 
     return type_hierarchy_items
-
-    module = ls.modules[params.text_document.uri]
-    match glue.stmt_from_lsp_position(module, params.position):
-        case (stmt, 'arg'):
-            pass
-        case _:
-            return None
-    if not stmt or not stmt.keyword == 'type' or not stmt.arg:
-        return None
-    prefix_parts = str(stmt.arg).rsplit(':')
-    if len(prefix_parts) == 1:
-        typedef_name = prefix_parts[0]
-        typedef_uri = params.text_document.uri
-        typedef_module = module
-    elif len(prefix_parts) == 2:
-        typedef_name = prefix_parts[1]
-        imp_mods = module.search('import')
-        for imp_mod in imp_mods:
-            imp_prefix = imp_mod.search_one('prefix')
-            if imp_prefix.arg == prefix_parts[0]:
-                break
-        typedef_module = None
-        for uri in ls.modules.keys():
-            typedef_module = ls.modules[uri]
-            if ls.modules[uri].arg == imp_mod.arg:
-                typedef_uri = uri
-                break
-    else:
-        return None
-    if not typedef_module:
-        return None
-    typedefs = typedef_module.search('typedef')
-
 
 def type_hierarchy_supertypes(
     ls: LanguageServer,
@@ -269,26 +280,83 @@ def type_hierarchy_supertypes(
     if not wfc:
         return None
 
+    if params.item.name in yang_type_specs:
+        return []
+
     type_hierarchy_items = []
 
-    type_name='testSuperType'
-    type_kind=lsp.SymbolKind.Class
-    type_range=lsp.Range(lsp.Position(0, 0), lsp.Position(0, 0))
-    type_select_range=lsp.Range(lsp.Position(0, 0), lsp.Position(0, 0))
-    type_tags=[lsp.SymbolTag.Deprecated]
-    type_detail='testSuperDetail'
+    try:
+        module = ls.modules[params.item.uri] # type: ignore
+        if not module:
+            return None
+    except KeyError:
+        return None
 
-    type_hierarchy_items.append(
-        lsp.TypeHierarchyItem(
-            name=type_name,
-            kind=type_kind,
-            uri=params.item.uri,
-            range=type_range,
-            selection_range=type_select_range,
-            tags=type_tags,
-            detail=type_detail,
-        )
-    )
+    match glue.stmt_from_lsp_position(module, params.item.selection_range.start):
+        case (stmt, 'arg'):
+            if not stmt or not stmt.arg:
+                return None
+            match stmt.keyword:
+                case 'typedef' | 'type':
+                    pass
+                case _:
+                    return None
+        case _:
+            return None
+
+    refing_stmts = common.get_referencing_stmts(stmt)
+    for refing_stmt in refing_stmts:
+        if refing_stmt.keyword == 'type':
+            if refing_stmt.parent.keyword == 'typedef':
+                typedef_stmt = refing_stmt.parent
+                prefix = typedef_stmt.top.i_prefix
+                type_name = prefix + ':' + typedef_stmt.arg
+                type_uri = from_fs_path(typedef_stmt.top.pos.ref)
+                if not type_uri:
+                    continue
+                type_range = glue.stmt_lsp_range(typedef_stmt.pos)
+                type_select_range = glue.arg_lsp_selection_range(typedef_stmt.pos)
+                type_kind = lsp.SymbolKind.Class
+                type_tags = []
+                type_detail = f"typedef ({basename(typedef_stmt.top.pos.ref)})"
+                type_hierarchy_items.append(
+                    lsp.TypeHierarchyItem(
+                        name=type_name,
+                        kind=type_kind,
+                        uri=type_uri,
+                        range=type_range,
+                        selection_range=type_select_range,
+                        tags=type_tags,
+                        detail=type_detail,
+                    )
+                )
+            elif refing_stmt.parent.keyword == 'type' and \
+                    refing_stmt.parent.arg and \
+                    refing_stmt.parent.arg == 'union':
+                if not refing_stmt.parent.parent:
+                    continue
+                typedef_stmt = refing_stmt.parent.parent
+                prefix = typedef_stmt.top.i_prefix
+                type_name = prefix + ':' + typedef_stmt.arg
+                type_uri = from_fs_path(typedef_stmt.top.pos.ref)
+                if not type_uri:
+                    continue
+                type_range = glue.stmt_lsp_range(typedef_stmt.pos)
+                type_select_range = glue.arg_lsp_selection_range(typedef_stmt.pos)
+                type_kind = lsp.SymbolKind.Class
+                type_tags = []
+                type_detail = f"type ({basename(typedef_stmt.top.pos.ref)})"
+                type_hierarchy_items.append(
+                    lsp.TypeHierarchyItem(
+                        name=type_name,
+                        kind=type_kind,
+                        uri=type_uri,
+                        range=type_range,
+                        selection_range=type_select_range,
+                        tags=type_tags,
+                        detail=type_detail,
+                    )
+                )
 
     return type_hierarchy_items
 
@@ -302,26 +370,74 @@ def type_hierarchy_subtypes(
     if not wfc:
         return None
 
+    if params.item.name in yang_type_specs and params.item.name != 'union':
+        return []
+
+    try:
+        module = ls.modules[params.item.uri] # type: ignore
+        if not module:
+            return None
+    except KeyError:
+        return None
+
     type_hierarchy_items = []
 
-    type_name='testSubType'
-    type_kind=lsp.SymbolKind.Class
-    type_range=lsp.Range(lsp.Position(0, 0), lsp.Position(0, 0))
-    type_select_range=lsp.Range(lsp.Position(0, 0), lsp.Position(0, 0))
-    type_tags=[lsp.SymbolTag.Deprecated]
-    type_detail='testSubDetail'
+    match glue.stmt_from_lsp_position(module, params.item.selection_range.start):
+        case (stmt, 'arg'):
+            if not stmt or not stmt.arg:
+                return None
+            match stmt.keyword:
+                case 'typedef' | 'type':
+                    if stmt.keyword == 'type' and stmt.arg == 'union':
+                        type_stmts = stmt.search('type')
+                    else:
+                        type_stmt = stmt.search_one('type')
+                        if not type_stmt or not type_stmt.arg:
+                            return None
+                        if type_stmt.arg == 'union':
+                            type_stmts = type_stmt.search('type')
+                        else:
+                            type_stmts = [type_stmt]
+                    for type_stmt in type_stmts:
+                        if not type_stmt.arg:
+                            continue
+                        type_name = type_stmt.arg
+                        type_kind = lsp.SymbolKind.Class
+                        type_tags = []
+                        if type_stmt.arg in yang_type_specs:
+                            type_detail = 'built-in'
+                            type_pos = type_stmt.pos
+                        else:
+                            typedef_stmt = common.referenced_stmt_from_stmt_arg(wfc.ctx, type_stmt)
+                            if not typedef_stmt:
+                                continue
+                            status_stmt = typedef_stmt.search_one('status')
+                            if status_stmt and status_stmt.arg in ['deprecated', 'obsolete']:
+                                type_tags.append(lsp.SymbolTag.Deprecated)
+                            type_detail = f"typedef ({basename(typedef_stmt.top.pos.ref)})"
+                            type_pos = typedef_stmt.pos
 
-    type_hierarchy_items.append(
-        lsp.TypeHierarchyItem(
-            name=type_name,
-            kind=type_kind,
-            uri=params.item.uri,
-            range=type_range,
-            selection_range=type_select_range,
-            tags=type_tags,
-            detail=type_detail,
-        )
-    )
+                        type_uri = from_fs_path(type_pos.ref)
+                        if not type_uri:
+                            continue
+                        type_range = glue.stmt_lsp_range(type_pos)
+                        type_select_range = glue.arg_lsp_selection_range(type_pos)
+
+                        type_hierarchy_items.append(
+                            lsp.TypeHierarchyItem(
+                                name=type_name,
+                                kind=type_kind,
+                                uri=type_uri,
+                                range=type_range,
+                                selection_range=type_select_range,
+                                tags=type_tags,
+                                detail=type_detail,
+                            )
+                        )
+                case _:
+                    return None
+        case _:
+            return None
 
     return type_hierarchy_items
 
