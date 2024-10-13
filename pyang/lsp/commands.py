@@ -4,6 +4,7 @@
   https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand
 """
 
+from asyncio import sleep
 import tempfile
 from typing import List
 
@@ -36,7 +37,7 @@ def _generate_puml(
 
     return puml_text
 
-def generate_puml_diagram(
+async def generate_puml_diagram(
     ls: LanguageServer,
     args: List[lsp.LSPAny],
 ):
@@ -101,6 +102,9 @@ def generate_puml_diagram(
             ]
         )
     )
+    # XXX: Following sleep is needed to allow VS Code extension to handle events in a dumb way
+    await sleep(0.5)
+    # XXX: Following imposition is needed since VS Code extension does not handle events smartly
     ls.show_document(
         params=lsp.ShowDocumentParams(
             uri=text_doc_uri,
@@ -144,7 +148,7 @@ def generate_tree_diagram(
     wfc = common.get_workspace_folder_context(ls, active_doc_uri)
     if not wfc:
         return
-    text_doc_uri = active_doc_uri + '.ytd'
+    text_doc_uri = active_doc_uri + '.tree'
     if not text_doc_uri:
         return
 
@@ -187,12 +191,6 @@ def generate_tree_diagram(
                 text_doc_create,
                 text_doc_edit,
             ]
-        )
-    )
-    ls.show_document(
-        params=lsp.ShowDocumentParams(
-            uri=text_doc_uri,
-            take_focus=True,
         )
     )
 
