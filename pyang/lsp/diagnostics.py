@@ -44,10 +44,16 @@ def _build_doc_diagnostics(
         msg = error.err_to_str(etag, eargs)
 
         def epos_to_lsp_range(etag: str, epos: error.Position) -> lsp.Range:
-            start_line = epos.arg_sline
-            start_col = epos.arg_schar
-            end_line = epos.arg_eline
-            end_col = epos.arg_echar
+            try:
+                start_line = epos.arg_sline
+                start_col = epos.arg_schar
+                end_line = epos.arg_eline
+                end_col = epos.arg_echar
+            except AttributeError:
+                return lsp.Range(
+                    start=lsp.Position(line=epos.line - 1, character=0),
+                    end=lsp.Position(line=epos.line, character=0),
+                )
             if etag == 'LONG_LINE' and wfc.ctx.max_line_len is not None:
                 start_line = epos.line - 1
                 start_col = wfc.ctx.max_line_len
@@ -118,12 +124,18 @@ def _build_doc_diagnostics(
             elif etag == 'DUPLICATE_CHILD_NAME':
                 dup_arg = 3
                 dup_msg = 'Original Child'
+            else:
+                continue
             dup_uri = from_fs_path(eargs[dup_arg].ref)
             dup_range = line_to_lsp_range(etag, eargs[dup_arg].line)
             if dup_uri:
                 dup_loc = lsp.Location(uri=dup_uri, range=dup_range)
-                rel_info.append(lsp.DiagnosticRelatedInformation(location=dup_loc,
-                                                             message=dup_msg))
+                rel_info.append(
+                    lsp.DiagnosticRelatedInformation(
+                        location=dup_loc,
+                        message=dup_msg,
+                    )
+                )
         elif etag == 'DUPLICATE_NAMESPACE':
             # TODO: handle
             pass

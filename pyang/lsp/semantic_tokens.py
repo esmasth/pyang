@@ -18,11 +18,10 @@ from pygls.server import LanguageServer
 from pyang import util
 from pyang.context import Context
 from pyang.grammar import data_def_stmts, flatten_spec, stmt_map
-from pyang.lsp import common
-from pyang.statements import Statement
+from pyang.statements import AugmentStatement, DeviationStatement, ModSubmodStatement, Statement
 from pyang.types import yang_type_specs
 
-from . import glue, maps
+from . import common, glue, maps
 
 TOKEN_TYPES: List[str] = [
     lsp.SemanticTokenTypes.Namespace,
@@ -274,10 +273,7 @@ def stmt_tokens(
                 deprecated = False
         else:
             data_def_kwds = [x[0] for x in flatten_spec(data_def_stmts)]
-            if stmt.keyword in data_def_kwds + ['grouping']:
-                deprecated = True
-            else:
-                deprecated = False
+            deprecated = stmt.keyword in data_def_kwds + ['grouping']
         if eline == sline:
             # single line argument
             length = echar - schar
@@ -288,38 +284,123 @@ def stmt_tokens(
                 delta_char += 1
             prefixed_arg_re = re.compile(r'(^[a-zA-Z0-9-_]+):([a-zA-Z0-9-_]+)$')
             m = prefixed_arg_re.match(stmt.arg)
-            if not m:
+            if stmt.keyword in ['augment', 'deviation']:
+                ref_stmt = None
+                if stmt.keyword == 'augment':
+                    aug: AugmentStatement = stmt # type: ignore
+                    ref_stmt = common.get_augmented_stmt(aug)
+                elif stmt.keyword == 'deviation':
+                    dev: DeviationStatement = stmt # type: ignore
+                    ref_stmt = common.get_deviated_stmt(dev)
+                stmts : List[Statement] = []
+                if ref_stmt:
+                    stmts.insert(0, ref_stmt)
+                    while ref_stmt.parent != ref_stmt.top:
+                        ref_stmt = ref_stmt.parent
+                        stmts.insert(0, ref_stmt)
+                # slice the stmt.arg across '/'
+                target : str = stmt.arg
+                nodes = target.split('/')
+                nodes = nodes[1:] if nodes[0] == '' else nodes
+                parent_stmt : Statement | ModSubmodStatement | None = None
+                mod_stmt = None
+                i = 0
+                for node in nodes:
+                    maybe_prefixed_arg_re = re.compile(r'^(([a-zA-Z0-9-_]+):)?([a-zA-Z0-9-_]+)$')
+                    m = maybe_prefixed_arg_re.match(node)
+                    # /
+                    length = 1
+                    tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Operator)
+                    tok_mods = 0
+                    tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+                    delta_line = 0
+                    delta_char = length
+                    schar += length
+                    if not m:
+                        continue
+                    prefix = m.group(2) if m.group(1) else None
+                    element = m.group(3)
+                    if prefix:
+                        # prefix
+                        length = len(prefix)
+                        tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Namespace)
+                        mod_prefix = stmt.top.search_one('prefix')
+                        if mod_prefix and mod_prefix.arg == prefix:
+                            mod_stmt = stmt.top
+                        else:
+                            imp_mods = stmt.top.search('import')
+                            for imp_mod in imp_mods:
+                                imp_prefix = imp_mod.search_one('prefix')
+                                if prefix != imp_prefix.arg:
+                                    continue
+                                revision = None
+                                imp_revdate = imp_mod.search_one('revision-date')
+                                if imp_revdate is not None:
+                                    revision = imp_revdate.arg
+                                mod_stmt = ctx.get_module(imp_mod.arg, revision)
+                                if mod_stmt:
+                                    break
+                        if not mod_stmt:
+                            break
+                        parent_stmt = parent_stmt if parent_stmt else mod_stmt
+                        tok_mods = arg_tok_mods(ctx, mod_stmt)
+                        tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+                        delta_line = 0
+                        delta_char = length
+                        schar += length
+                        # :
+                        length = 1
+                        tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Operator)
+                        tok_mods = 0
+                        tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+                        delta_line = 0
+                        delta_char = length
+                        schar += length
+                    # element
+                    length = len(element)
+                    elem_stmt = stmts[i]
+                    tok_type = arg_token_idx(ctx, elem_stmt)
+                    tok_mods = arg_tok_mods(ctx, elem_stmt)
+                    tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+                    delta_line = 0
+                    delta_char = length
+                    schar += length
+                    i += 1
+            elif not m:
                 tok_type = arg_token_idx(ctx, stmt)
                 tok_mods = arg_tok_mods(ctx, stmt, deprecated)
                 tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
             elif stmt.keyword in ['type', 'if-feature', 'uses', 'base']:
-                # prefix
                 prefix = m.group(1)
-                arg = m.group(2)
+                element = m.group(2)
+                # prefix
                 length = len(prefix)
                 tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Namespace)
                 tok_mods = 0
                 tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
-                # :
                 delta_line = 0
                 delta_char = length
                 schar += length
+                # :
                 length = 1
                 tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Operator)
                 tok_mods = 0
                 tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
-                # arg
                 delta_line = 0
                 delta_char = length
                 schar += length
-                length = len(arg)
+                # element
+                length = len(element)
                 tok_type = arg_token_idx(ctx, stmt)
                 tok_mods = arg_tok_mods(ctx, stmt)
                 tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
         else:
             # multi line argument
             tok_type = arg_token_idx(ctx, stmt)
-            tok_mods = arg_tok_mods(ctx, stmt)
+            if stmt.keyword in ['augment', 'deviation']:
+                tok_mods = arg_tok_mods(ctx, stmt)
+            else:
+                tok_mods = arg_tok_mods(ctx, stmt)
             # XXX: presuming strings split by + or \n are always aligned
             delta_char += 1
             for arg_substr in stmt.arg_substrings: # type: ignore

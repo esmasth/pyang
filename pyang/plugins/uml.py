@@ -134,22 +134,23 @@ class UMLPlugin(plugin.PyangPlugin):
         self.mods = [module.arg] + [i.arg for i in module.search('include')]
 
     def emit(self, ctx, modules, fd):
-        for epos, etag, eargs in ctx.errors:
+        for epos, etag, _eargs in ctx.errors:
             if ((epos.top is None or epos.top.arg in self.mods) and
                 error.is_error(error.err_level(etag))):
-                self.fatal("%s contains errors" % epos.top.arg)
+                mod_file: str = epos.top.arg if epos.top and epos.top.arg else epos.ref
+                self.fatal(f"{mod_file} contains errors")
 
 
         if ctx.opts.uml_pages_layout is not None:
             if re.match('[0-9]x[0-9]', ctx.opts.uml_pages_layout) is None:
-                self.fatal("Illegal page split option %s, should be [0-9]x[0-9], example 2x2" % ctx.opts.uml_pages_layout)
+                self.fatal(f"Illegal page split option {ctx.opts.uml_pages_layout}, should be [0-9]x[0-9], example 2x2")
 
 
         umldoc = uml_emitter(ctx)
         umldoc.emit(modules, fd)
 
-    def fatal(self, exitCode=1):
-        raise error.EmitError(self, exitCode)
+    def fatal(self, msg, exitCode=1):
+        raise error.EmitError(msg, exitCode)
 
 
 class uml_emitter:

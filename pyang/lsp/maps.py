@@ -590,7 +590,7 @@ keyword_map = {
     'mandatory': {
         'symbol'    : lsp.SymbolKind.Property,
         'completion': lsp.CompletionItemKind.Property,
-        'semantic'  : lsp.SemanticTokenTypes.Property,
+        'semantic'  : lsp.SemanticTokenTypes.EnumMember,
         'modifiers' : [
         ],
     },
