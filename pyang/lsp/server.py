@@ -262,6 +262,7 @@ def initialized(
     """Handles LSP `initialized` notification."""
 
     def init_workspace_folder(wfc: workspace.WorkspaceFolderContext, uri: str):
+        wfc.ctx.keep_comments = False
         wfc.ls = ls # type: ignore
         _clear_ctx_validation(ls, wfc.ctx)
         yang_uris = _get_folder_yang_uris(uri)

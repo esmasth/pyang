@@ -323,6 +323,8 @@ class YangParser(object):
         # we would like to see if a statement is a comment, and if so
         # treat it differently than we treat keywords further down
         if self.ctx.keep_comments:
+            self.pos.stmt_sline = self.tokenizer.pos.line - 1
+            self.pos.stmt_schar = self.tokenizer.offset
             cmt, is_line_end, is_multi_line = self.tokenizer.get_comment(self.last_line)
             if cmt is not None:
                 stmt = statements.new_statement(self.top,
@@ -334,6 +336,8 @@ class YangParser(object):
                 stmt.is_multi_line = is_multi_line
                 # just ignore Comments outside the module
                 if parent is not None:
+                    stmt.pos.stmt_eline = self.tokenizer.pos.line - 1
+                    stmt.pos.stmt_echar = self.tokenizer.offset
                     return stmt
 
         self.tokenizer.skip()

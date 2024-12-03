@@ -704,3 +704,32 @@ Following property keys are present
 
 https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide#standard-token-types-and-modifiers
 """
+
+xpath_token_type_map = {
+    'function_name': lsp.SemanticTokenTypes.Function,
+    'name': lsp.SemanticTokenTypes.Class,
+    'number': lsp.SemanticTokenTypes.Number,
+    'literal': lsp.SemanticTokenTypes.String,
+    'LPAREN': lsp.SemanticTokenTypes.Operator,
+    'RPAREN': lsp.SemanticTokenTypes.Operator,
+    'LBRACKET': lsp.SemanticTokenTypes.Operator,
+    'RBRACKET': lsp.SemanticTokenTypes.Operator,
+    'DOTDOT': lsp.SemanticTokenTypes.Operator,
+    'DOT': lsp.SemanticTokenTypes.Operator,
+    'COMMA': lsp.SemanticTokenTypes.Operator,
+    'AT': lsp.SemanticTokenTypes.Operator,
+    'DOLLAR': lsp.SemanticTokenTypes.Operator,
+    'DOUBLECOLON': lsp.SemanticTokenTypes.Operator,
+    'DOUBLESLASH': lsp.SemanticTokenTypes.Operator,
+    'SLASH': lsp.SemanticTokenTypes.Operator,
+    'BAR': lsp.SemanticTokenTypes.Operator,
+    'PLUS': lsp.SemanticTokenTypes.Operator,
+    'MINUS': lsp.SemanticTokenTypes.Operator,
+    'EQ': lsp.SemanticTokenTypes.Operator,
+    'NEQ': lsp.SemanticTokenTypes.Operator,
+    'LTE': lsp.SemanticTokenTypes.Operator,
+    'GTE': lsp.SemanticTokenTypes.Operator,
+    'GT': lsp.SemanticTokenTypes.Operator,
+    'LT': lsp.SemanticTokenTypes.Operator,
+    'STAR': lsp.SemanticTokenTypes.Operator,
+}

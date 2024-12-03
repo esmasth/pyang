@@ -15,10 +15,15 @@ from typing import List, Tuple, Union
 from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
-from pyang import util
+from pyang import util, xpath, xpath_lexer, xpath_parser
 from pyang.context import Context
 from pyang.grammar import data_def_stmts, flatten_spec, stmt_map
-from pyang.statements import AugmentStatement, DeviationStatement, ModSubmodStatement, Statement
+from pyang.statements import (
+    AugmentStatement,
+    DeviationStatement,
+    ModSubmodStatement,
+    Statement,
+)
 from pyang.types import yang_type_specs
 
 from . import common, glue, maps
@@ -123,6 +128,10 @@ def _update_tok_mods(tok_mods: int, mod: str) -> int:
     tok_mods |= 1 << TOKEN_MODIFIERS.index(mod)
     return tok_mods
 
+def _unset_tok_mods(tok_mods: int, mod: str) -> int:
+    tok_mods &= ~(1 << TOKEN_MODIFIERS.index(mod))
+    return tok_mods
+
 def arg_tok_mods(ctx: Context, stmt: Statement, deprecated: bool = False) -> int:
     tok_mods = 0
     def _set_tok_mod(mod: str) -> None:
@@ -214,6 +223,8 @@ def stmt_tokens(
     parent_deprecated: bool = False,
 ) -> Tuple[List[SemanticToken], Tuple[int, int]]:
     tokens: List[SemanticToken] = []
+    if stmt.keyword == '_comment':
+        return ([], (0, 0))
     # kwd token
     sel_range = glue.kwd_lsp_selection_range(stmt.pos)
     sline = sel_range.start.line
@@ -282,7 +293,7 @@ def stmt_tokens(
             if substring[1] != '':
                 length = length - 2
                 delta_char += 1
-            prefixed_arg_re = re.compile(r'(^[a-zA-Z0-9-_]+):([a-zA-Z0-9-_]+)$')
+            prefixed_arg_re = re.compile(r'(^' + xpath_lexer.namestr + r'):(' + xpath_lexer.namestr + r')$')
             m = prefixed_arg_re.match(stmt.arg)
             if stmt.keyword in ['augment', 'deviation']:
                 ref_stmt = None
@@ -306,8 +317,7 @@ def stmt_tokens(
                 mod_stmt = None
                 i = 0
                 for node in nodes:
-                    maybe_prefixed_arg_re = re.compile(r'^(([a-zA-Z0-9-_]+):)?([a-zA-Z0-9-_]+)$')
-                    m = maybe_prefixed_arg_re.match(node)
+                    m = xpath_lexer.re_ncname.match(node)
                     # /
                     length = 1
                     tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Operator)
@@ -344,6 +354,7 @@ def stmt_tokens(
                             break
                         parent_stmt = parent_stmt if parent_stmt else mod_stmt
                         tok_mods = arg_tok_mods(ctx, mod_stmt)
+                        tok_mods = _unset_tok_mods(tok_mods, lsp.SemanticTokenModifiers.Definition)
                         tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
                         delta_line = 0
                         delta_char = length
@@ -367,9 +378,23 @@ def stmt_tokens(
                     schar += length
                     i += 1
             elif not m:
-                tok_type = arg_token_idx(ctx, stmt)
-                tok_mods = arg_tok_mods(ctx, stmt, deprecated)
-                tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+                if stmt.keyword in ['when', 'must', 'path', 'refine']:
+                    xptoks = xpath_lexer.scan(stmt.arg)
+                    for xptok in xptoks:
+                        length = len(xptok.value)
+                        try:
+                            tok_type = TOKEN_TYPES.index(maps.xpath_token_type_map[xptok.type])
+                            tok_mods = 0
+                            tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+                            delta_line = 0
+                            delta_char = length
+                            schar += length
+                        except KeyError:
+                            delta_char += length
+                else:
+                    tok_type = arg_token_idx(ctx, stmt)
+                    tok_mods = arg_tok_mods(ctx, stmt, deprecated)
+                    tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
             elif stmt.keyword in ['type', 'if-feature', 'uses', 'base']:
                 prefix = m.group(1)
                 element = m.group(2)
@@ -396,20 +421,104 @@ def stmt_tokens(
                 tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
         else:
             # multi line argument
-            tok_type = arg_token_idx(ctx, stmt)
             if stmt.keyword in ['augment', 'deviation']:
-                tok_mods = arg_tok_mods(ctx, stmt)
-            else:
-                tok_mods = arg_tok_mods(ctx, stmt)
+                ref_stmt = None
+                if stmt.keyword == 'augment':
+                    aug: AugmentStatement = stmt # type: ignore
+                    ref_stmt = common.get_augmented_stmt(aug)
+                elif stmt.keyword == 'deviation':
+                    dev: DeviationStatement = stmt # type: ignore
+                    ref_stmt = common.get_deviated_stmt(dev)
+                stmts : List[Statement] = []
+                if ref_stmt:
+                    stmts.insert(0, ref_stmt)
+                    while ref_stmt.parent != ref_stmt.top:
+                        ref_stmt = ref_stmt.parent
+                        stmts.insert(0, ref_stmt)
             # XXX: presuming strings split by + or \n are always aligned
             delta_char += 1
+            first_delta_char = delta_char
             for arg_substr in stmt.arg_substrings: # type: ignore
                 arg_toks = arg_substr[0].split('\n')
                 for arg_tok in arg_toks:
-                    tokens.append((delta_line, delta_char, len(arg_tok), tok_type, tok_mods))
-                    delta_line = 1
+                    if stmt.keyword in ['augment', 'deviation']:
+                        # slice the arg_tok across '/'
+                        target : str = arg_tok
+                        orig_nodes = target.split('/')
+                        nodes = orig_nodes[1:] if orig_nodes[0] == '' else orig_nodes
+                        delta_char = (delta_char - 1) if nodes[0] == '' else delta_char
+                        parent_stmt : Statement | ModSubmodStatement | None = None
+                        mod_stmt = None
+                        i = 0
+                        for node in nodes:
+                            m = xpath_lexer.re_ncname.match(node)
+                            if i != 0 or orig_nodes[0] == '':
+                                # /
+                                length = 1
+                                tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Operator)
+                                tok_mods = 0
+                                tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+                                delta_line = 0
+                                delta_char = length
+                                schar += length
+                            if not m:
+                                continue
+                            prefix = m.group(2) if m.group(1) else None
+                            element = m.group(3)
+                            if prefix:
+                                # prefix
+                                length = len(prefix)
+                                tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Namespace)
+                                mod_prefix = stmt.top.search_one('prefix')
+                                if mod_prefix and mod_prefix.arg == prefix:
+                                    mod_stmt = stmt.top
+                                else:
+                                    imp_mods = stmt.top.search('import')
+                                    for imp_mod in imp_mods:
+                                        imp_prefix = imp_mod.search_one('prefix')
+                                        if prefix != imp_prefix.arg:
+                                            continue
+                                        revision = None
+                                        imp_revdate = imp_mod.search_one('revision-date')
+                                        if imp_revdate is not None:
+                                            revision = imp_revdate.arg
+                                        mod_stmt = ctx.get_module(imp_mod.arg, revision)
+                                        if mod_stmt:
+                                            break
+                                if not mod_stmt:
+                                    break
+                                parent_stmt = parent_stmt if parent_stmt else mod_stmt
+                                tok_mods = arg_tok_mods(ctx, mod_stmt)
+                                tok_mods = _unset_tok_mods(tok_mods, lsp.SemanticTokenModifiers.Definition)
+                                tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+                                delta_line = 0
+                                delta_char = length
+                                schar += length
+                                # :
+                                length = 1
+                                tok_type = TOKEN_TYPES.index(lsp.SemanticTokenTypes.Operator)
+                                tok_mods = 0
+                                tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+                                delta_line = 0
+                                delta_char = length
+                                schar += length
+                            # element
+                            length = len(element)
+                            elem_stmt = stmts[i]
+                            tok_type = arg_token_idx(ctx, elem_stmt)
+                            tok_mods = arg_tok_mods(ctx, elem_stmt)
+                            tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
+                            delta_char = length
+                            schar += length
+                            i += 1
+                    else:
+                        tok_type = arg_token_idx(ctx, stmt)
+                        tok_mods = arg_tok_mods(ctx, stmt)
+                        tokens.append((delta_line, delta_char, len(arg_tok), tok_type, tok_mods))
+                        delta_char = schar + 1
                     sline += 1
-                    delta_char = schar + 1
+                    delta_line = 1
+                delta_char = first_delta_char + 2
             delta_line = 0
             sline -= 1
         prev_line = sline

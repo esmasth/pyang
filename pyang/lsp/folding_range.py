@@ -14,7 +14,6 @@ from pyang.error import Position
 from pyang.lsp import common
 from pyang.statements import ModSubmodStatement, Statement
 
-
 def _stmt_ranges(stmt: Statement) -> List[lsp.FoldingRange]:
     ranges = []
     pos: Position = stmt.pos
@@ -35,6 +34,19 @@ def _stmt_ranges(stmt: Statement) -> List[lsp.FoldingRange]:
         )
         for substmt in stmt.substmts:
             ranges.extend(_stmt_ranges(substmt))
+    else:
+        if stmt.keyword in [s for s, _ in grammar.meta_stmts] + ['_comment'] \
+                and pos.stmt_sline != pos.stmt_eline:
+            ranges.append(
+                lsp.FoldingRange(
+                    start_line=pos.stmt_sline,
+                    start_character=pos.stmt_schar + 1,
+                    end_line=pos.stmt_eline,
+                    end_character=pos.stmt_echar,
+                    kind=lsp.FoldingRangeKind.Comment,
+                    collapsed_text=None,
+                )
+            )
     return ranges
 
 def _imports_ranges(module: ModSubmodStatement) -> List[lsp.FoldingRange]:
@@ -43,15 +55,25 @@ def _imports_ranges(module: ModSubmodStatement) -> List[lsp.FoldingRange]:
     in_range = False
     for stmt in module.substmts:
         pos: Position = stmt.pos
-        if stmt.keyword in grammar.module_header_stmts + grammar.linkage_stmts + grammar.meta_stmts:
+        if stmt.keyword in \
+                [s for s, _ in \
+                    grammar.module_header_stmts + \
+                    grammar.submodule_header_stmts + \
+                    grammar.linkage_stmts + \
+                    grammar.revision_stmts + \
+                    grammar.meta_stmts]:
             if not in_range:
-                start_line = pos.sub_sline
+                start_line = pos.stmt_sline
                 start_character = None
                 in_range = True
-            end_line = pos.sub_eline
+            end_line = pos.stmt_eline
             end_character = None
         else:
             if in_range:
+                if isinstance(stmt.keyword, tuple):
+                    end_line = pos.stmt_eline
+                    end_character = None
+                    continue
                 in_range = False
                 ranges.append(
                     lsp.FoldingRange(
