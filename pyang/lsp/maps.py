@@ -732,4 +732,9 @@ xpath_token_type_map = {
     'GT': lsp.SemanticTokenTypes.Operator,
     'LT': lsp.SemanticTokenTypes.Operator,
     'STAR': lsp.SemanticTokenTypes.Operator,
+    'DIV': lsp.SemanticTokenTypes.Operator,
+    'AND': lsp.SemanticTokenTypes.Operator,
+    'OR': lsp.SemanticTokenTypes.Operator,
+    'MOD': lsp.SemanticTokenTypes.Operator,
 }
+"""pyang xpath token type mapping to LSP"""

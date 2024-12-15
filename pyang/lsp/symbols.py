@@ -23,10 +23,9 @@ from pygls.server import LanguageServer
 
 from pyang import error, grammar
 from pyang.context import Context
-from pyang.lsp import common, maps
 from pyang.statements import LeafLeaflistStatement, Statement
 
-from . import glue
+from . import common, glue, maps
 
 
 def _stmt_to_lsp_symbol_kind(ctx: Context, stmt: Statement) -> lsp.SymbolKind:

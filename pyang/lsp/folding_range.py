@@ -11,8 +11,10 @@ from pygls.server import LanguageServer
 
 from pyang import grammar
 from pyang.error import Position
-from pyang.lsp import common
 from pyang.statements import ModSubmodStatement, Statement
+
+from . import common
+
 
 def _stmt_ranges(stmt: Statement) -> List[lsp.FoldingRange]:
     ranges = []

@@ -319,7 +319,7 @@ stmt_map = {
     },
     'config': {
         'title': 'The "`config`" Statement',
-        'brief': 'The "`config`" statement takes as an argument the string "true" or "false".  If "`config`" is "`true`", the definition represents configuration.  Data nodes representing configuration are part of configuration datastores.\n\nIf "`config`" is "`false`", the definition represents state data.  Data nodes representing state data are not part of configuration datastores.',
+        'brief': 'The "`config`" statement takes as an argument the string "`true`" or "`false`".  If "`config`" is "`true`", the definition represents configuration.  Data nodes representing configuration are part of configuration datastores.\n\nIf "`config`" is "`false`", the definition represents state data.  Data nodes representing state data are not part of configuration datastores.',
         'uri': 'https://datatracker.ietf.org/doc/html/rfc7950#section-7.21.1',
     },
     'status': {

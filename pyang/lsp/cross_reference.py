@@ -18,14 +18,13 @@ from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 from pygls.uris import from_fs_path
 
-from pyang.lsp import common
 from pyang.statements import (
     AugmentStatement,
     DeviationStatement,
     Statement,
 )
 
-from . import glue
+from . import common, glue
 from .rfc import stmt_map
 
 

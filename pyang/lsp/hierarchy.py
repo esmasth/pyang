@@ -21,9 +21,10 @@ from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 from pygls.uris import from_fs_path
 
-from pyang.lsp import common, glue
 from pyang.statements import ModSubmodStatement
 from pyang.types import yang_type_specs
+
+from . import common, glue
 
 
 def text_document_prepare_call_hierarchy(

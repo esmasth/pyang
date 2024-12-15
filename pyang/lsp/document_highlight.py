@@ -9,9 +9,7 @@ from typing import List, Union
 from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
-from pyang.lsp import common
-
-from . import glue
+from . import common, glue
 
 
 def text_document_document_highlight(

@@ -14,8 +14,9 @@ from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
 from pyang.error import Position
-from pyang.lsp import common
 from pyang.statements import LeafLeaflistStatement, Statement
+
+from . import common
 
 
 def create_item(

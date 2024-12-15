@@ -179,6 +179,7 @@ class YangTokenizer(object):
             # collect output in strs (list of strings)
             strs = []
             res = []
+            res_start = []
             # remember position of " character
             indentpos = self.offset
             i = 1
@@ -189,7 +190,8 @@ class YangTokenizer(object):
                     if self.buf[i] == quote_char:
                         # end-of-string; copy the buf to output
                         res.append(self.buf[start:i])
-                        strs.append((''.join(res), quote_char))
+                        res_start.append(start)
+                        strs.append((''.join(res), quote_char, indentpos, res_start))
                         # and trim buf
                         self.set_buf(i+1)
                         self.tquote_line = self.pos.line - 1

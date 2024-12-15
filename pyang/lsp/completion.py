@@ -16,7 +16,6 @@ from pygls.server import LanguageServer
 
 from pyang import grammar, types
 from pyang.context import Context
-from pyang.lsp import common
 from pyang.plugins import lint
 from pyang.statements import (
     ImportStatement,
@@ -25,7 +24,7 @@ from pyang.statements import (
 )
 from pyang.translators import yang
 
-from . import glue, maps, rfc
+from . import common, glue, maps, rfc
 
 INDENT_STEP = 2
 

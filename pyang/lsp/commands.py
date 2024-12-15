@@ -12,10 +12,11 @@ from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
 from pyang.error import EmitError
-from pyang.lsp import common
 from pyang.plugins import tree, uml
 from pyang.statements import ModSubmodStatement
 from pyang.workspace import WorkspaceFolderContext
+
+from . import common
 
 treefmt = tree.TreePlugin()
 pumlfmt = uml.UMLPlugin()

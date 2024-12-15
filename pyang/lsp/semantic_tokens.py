@@ -15,7 +15,7 @@ from typing import List, Tuple, Union
 from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
-from pyang import util, xpath, xpath_lexer, xpath_parser
+from pyang import util, xpath_lexer
 from pyang.context import Context
 from pyang.grammar import data_def_stmts, flatten_spec, stmt_map
 from pyang.statements import (
@@ -380,17 +380,34 @@ def stmt_tokens(
             elif not m:
                 if stmt.keyword in ['when', 'must', 'path', 'refine']:
                     xptoks = xpath_lexer.scan(stmt.arg)
-                    for xptok in xptoks:
-                        length = len(xptok.value)
-                        try:
-                            tok_type = TOKEN_TYPES.index(maps.xpath_token_type_map[xptok.type])
-                            tok_mods = 0
-                            tokens.append((delta_line, delta_char, length, tok_type, tok_mods))
-                            delta_line = 0
-                            delta_char = length
-                            schar += length
-                        except KeyError:
-                            delta_char += length
+                    xptok_idx = 0
+                    substr_idx = 0
+                    char_diff = 0
+                    xptok_len = 0
+                    for arg_substr in stmt.arg_substrings: # type: ignore
+                        length = 0
+                        if substr_idx > 0:
+                            delta_char = arg_substr[2] - schar - char_diff + xptok_len
+                        char_diff = 0
+                        xptok_len = 0
+                        while xptok_idx < len(xptoks):
+                            xptok = xptoks[xptok_idx]
+                            xptok_len = len(repr(xptok.value)) - 2
+                            length += xptok_len
+                            if length > len(arg_substr[0]):
+                                break
+                            xptok_idx += 1
+                            try:
+                                tok_type = TOKEN_TYPES.index(maps.xpath_token_type_map[xptok.type])
+                                tok_mods = 0
+                                tokens.append((delta_line, delta_char, xptok_len, tok_type, tok_mods))
+                                delta_line = 0
+                                delta_char = xptok_len
+                                schar += xptok_len
+                            except KeyError:
+                                delta_char += xptok_len
+                                char_diff += xptok_len
+                        substr_idx += 1
                 else:
                     tok_type = arg_token_idx(ctx, stmt)
                     tok_mods = arg_tok_mods(ctx, stmt, deprecated)
@@ -438,8 +455,15 @@ def stmt_tokens(
             # XXX: presuming strings split by + or \n are always aligned
             delta_char += 1
             first_delta_char = delta_char
+            if stmt.keyword in ['when', 'must', 'path', 'refine']:
+                xptoks = xpath_lexer.scan(stmt.arg)
+            xptok_idx = 0
+            substr_idx = 0
             for arg_substr in stmt.arg_substrings: # type: ignore
                 arg_toks = arg_substr[0].split('\n')
+                if substr_idx != 0:
+                    delta_char = arg_substr[2] + 1
+                argtok_idx = 0
                 for arg_tok in arg_toks:
                     if stmt.keyword in ['augment', 'deviation']:
                         # slice the arg_tok across '/'
@@ -511,6 +535,31 @@ def stmt_tokens(
                             delta_char = length
                             schar += length
                             i += 1
+                    elif stmt.keyword in ['when', 'must', 'path', 'refine']:
+                        length = 0
+                        if argtok_idx != 0:
+                            delta_char = arg_substr[3][0]
+                        while xptok_idx < len(xptoks):
+                            xptok = xptoks[xptok_idx]
+                            if '\n' in xptok.value:
+                                xptok.value = xptok.value.replace('\n', '')
+                                break
+                            xptok_len = len(repr(xptok.value)) - 2
+                            length += xptok_len
+                            if length > len(arg_tok):
+                                break
+                            xptok_idx += 1
+                            if xptok.value == '\n':
+                                break
+                            try:
+                                tok_type = TOKEN_TYPES.index(maps.xpath_token_type_map[xptok.type])
+                                tok_mods = 0
+                                tokens.append((delta_line, delta_char, xptok_len, tok_type, tok_mods))
+                                delta_line = 0
+                                delta_char = xptok_len
+                                schar += xptok_len
+                            except KeyError:
+                                delta_char += xptok_len
                     else:
                         tok_type = arg_token_idx(ctx, stmt)
                         tok_mods = arg_tok_mods(ctx, stmt)
@@ -518,7 +567,8 @@ def stmt_tokens(
                         delta_char = schar + 1
                     sline += 1
                     delta_line = 1
-                delta_char = first_delta_char + 2
+                    argtok_idx += 1
+                substr_idx += 1
             delta_line = 0
             sline -= 1
         prev_line = sline

@@ -18,11 +18,12 @@ from pygls.server import LanguageServer
 from pygls.workspace import TextDocument
 
 from pyang.context import Context
-from pyang.lsp import server
 from pyang.statements import ModSubmodStatement
 from pyang.translators import yang
 from pyang.workspace import WorkspaceFolderContext
-from . import common
+
+from . import common, server
+
 
 yangfmt = yang.YANGPlugin()
 

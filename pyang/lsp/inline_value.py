@@ -13,7 +13,7 @@ from typing import List, Union
 from lsprotocol import types as lsp
 from pygls.server import LanguageServer
 
-from pyang.lsp import common
+from . import common
 
 
 def text_document_inline_value(
