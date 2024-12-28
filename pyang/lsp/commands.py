@@ -51,7 +51,8 @@ async def generate_puml_diagram(
     if not active_doc_uri or not active_doc_uri.endswith('.yang'):
         return
     try:
-        module = ls.modules[active_doc_uri] # type: ignore
+        norm_uri = common.normalize_uri(active_doc_uri)
+        module = ls.modules[norm_uri] # type: ignore
     except KeyError:
         return
 
@@ -142,7 +143,8 @@ def generate_tree_diagram(
     if not active_doc_uri or not active_doc_uri.endswith('.yang'):
         return
     try:
-        module = ls.modules[active_doc_uri] # type: ignore
+        norm_uri = common.normalize_uri(active_doc_uri)
+        module = ls.modules[norm_uri] # type: ignore
     except KeyError:
         return
 

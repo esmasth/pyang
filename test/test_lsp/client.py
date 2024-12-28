@@ -6,14 +6,14 @@ import asyncio
 import json
 import logging
 import os
-import shutil
 import sys
 import traceback
 from typing import List
-from pygls.lsp.client import BaseLanguageClient
+
 from lsprotocol import types as lsp
-from pygls.uris import from_fs_path, to_fs_path
 from pygls.exceptions import PyglsError, JsonRpcException
+from pygls.lsp.client import BaseLanguageClient
+from pygls.uris import from_fs_path, to_fs_path
 
 CLIENT_NAME = 'pyangtlc'
 CLIENT_VERSION = 'v0.1'

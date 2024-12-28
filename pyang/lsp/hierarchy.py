@@ -38,7 +38,8 @@ def text_document_prepare_call_hierarchy(
         return None
 
     try:
-        module = ls.modules[params.text_document.uri] # type: ignore
+        norm_uri = common.normalize_uri(params.text_document.uri)
+        module = ls.modules[norm_uri] # type: ignore
         if not module:
             return None
     except KeyError:
@@ -89,7 +90,8 @@ def call_hierarchy_incoming_calls(
         return None
 
     try:
-        module: ModSubmodStatement = ls.modules[params.item.uri] # type: ignore
+        norm_uri = common.normalize_uri(params.item.uri)
+        module: ModSubmodStatement = ls.modules[norm_uri] # type: ignore
         if not module:
             return None
     except KeyError:
@@ -139,7 +141,8 @@ def call_hierarchy_outgoing_calls(
         return None
 
     try:
-        module: ModSubmodStatement | None = ls.modules[params.item.uri] # type: ignore
+        norm_uri = common.normalize_uri(params.item.uri)
+        module: ModSubmodStatement | None = ls.modules[norm_uri] # type: ignore
         if not module:
             return None
     except KeyError:
@@ -209,7 +212,8 @@ def text_document_prepare_type_hierarchy(
         return None
 
     try:
-        module = ls.modules[params.text_document.uri] # type: ignore
+        norm_uri = common.normalize_uri(params.text_document.uri)
+        module = ls.modules[norm_uri] # type: ignore
         if not module:
             return None
     except KeyError:
@@ -287,7 +291,8 @@ def type_hierarchy_supertypes(
     type_hierarchy_items = []
 
     try:
-        module = ls.modules[params.item.uri] # type: ignore
+        norm_uri = common.normalize_uri(params.item.uri)
+        module = ls.modules[norm_uri] # type: ignore
         if not module:
             return None
     except KeyError:
@@ -375,7 +380,8 @@ def type_hierarchy_subtypes(
         return []
 
     try:
-        module = ls.modules[params.item.uri] # type: ignore
+        norm_uri = common.normalize_uri(params.item.uri)
+        module = ls.modules[norm_uri] # type: ignore
         if not module:
             return None
     except KeyError:

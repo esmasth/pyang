@@ -345,7 +345,8 @@ def text_document_completion(
         return None
 
     try:
-        module: ModSubmodStatement | None = ls.modules[params.text_document.uri] # type: ignore
+        norm_uri = common.normalize_uri(params.text_document.uri)
+        module: ModSubmodStatement | None = ls.modules[norm_uri] # type: ignore
         if not module:
             return None
     except KeyError:

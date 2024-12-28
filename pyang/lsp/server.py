@@ -168,14 +168,15 @@ def start_server(pyangls: PyangLanguageServer, optargs: optparse.Values):
 def _delete_from_ctx(ls: PyangLanguageServer, ctx: context.Context, text_doc: TextDocument):
     if not ls.modules:
         return
+    norm_uri = common.normalize_uri(text_doc.uri)
     try:
-        module = ls.modules[text_doc.uri]
+        module = ls.modules[norm_uri]
         if not module:
             return
     except KeyError:
         return
     ctx.del_module(module)
-    del ls.modules[text_doc.uri]
+    del ls.modules[norm_uri]
 
 def _add_to_ctx(ls: PyangLanguageServer, ctx: context.Context, text_doc: TextDocument):
     assert text_doc.filename
@@ -191,7 +192,8 @@ def _add_to_ctx(ls: PyangLanguageServer, ctx: context.Context, text_doc: TextDoc
         module = ctx.add_module(text_doc.path, text_doc.source,
                                 primary_module=True)
     # if module:
-    ls.modules[text_doc.uri] = module
+    norm_uri = common.normalize_uri(text_doc.uri)
+    ls.modules[norm_uri] = module
     return module
 
 def _update_ctx_modules(ls: PyangLanguageServer, ctx: context.Context):

@@ -153,7 +153,8 @@ def text_document_inlay_hint(
         return None
 
     try:
-        module = ls.modules[params.text_document.uri] # type: ignore
+        norm_uri = common.normalize_uri(params.text_document.uri)
+        module = ls.modules[norm_uri] # type: ignore
         if not module:
             return None
     except KeyError:
